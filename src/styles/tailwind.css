@@ -1,0 +1,126 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Core Colors */
+    --color-background: #f8fafc; /* slate-50 */
+    --color-foreground: #0f172a; /* slate-900 */
+    --color-border: #e2e8f0; /* slate-200 */
+    --color-input: #ffffff; /* white */
+    --color-ring: #0ea5e9; /* sky-500 */
+    
+    /* Card Colors */
+    --color-card: #ffffff; /* white */
+    --color-card-foreground: #0f172a; /* slate-900 */
+    
+    /* Popover Colors */
+    --color-popover: #ffffff; /* white */
+    --color-popover-foreground: #0f172a; /* slate-900 */
+    
+    /* Muted Colors */
+    --color-muted: #f1f5f9; /* slate-100 */
+    --color-muted-foreground: #64748b; /* slate-500 */
+    
+    /* Primary Colors */
+    --color-primary: #1e293b; /* slate-800 */
+    --color-primary-foreground: #f8fafc; /* slate-50 */
+    
+    /* Secondary Colors */
+    --color-secondary: #475569; /* slate-600 */
+    --color-secondary-foreground: #f8fafc; /* slate-50 */
+    
+    /* Accent Colors */
+    --color-accent: #0ea5e9; /* sky-500 */
+    --color-accent-foreground: #ffffff; /* white */
+    
+    /* Success Colors */
+    --color-success: #059669; /* emerald-600 */
+    --color-success-foreground: #ffffff; /* white */
+    
+    /* Warning Colors */
+    --color-warning: #d97706; /* amber-600 */
+    --color-warning-foreground: #ffffff; /* white */
+    
+    /* Error/Destructive Colors */
+    --color-error: #dc2626; /* red-600 */
+    --color-error-foreground: #ffffff; /* white */
+    --color-destructive: #dc2626; /* red-600 */
+    --color-destructive-foreground: #ffffff; /* white */
+    
+    /* Border Radius Variables - Fix missing --radius */
+    --radius: 0.5rem; /* 8px - Base radius for Tailwind config */
+    --radius-sm: 0.33rem; /* was 0.3rem (3px -> 3.3px) */
+    --radius-default: 0.44rem; /* was 0.4rem (4px -> 4.4px) */  
+    --radius-md: 0.55rem; /* was 0.5rem (8px -> 8.8px) */
+    --radius-lg: 0.88rem; /* was 0.8rem (12px -> 13.2px) */
+    --radius-xl: 1.32rem; /* was 1.2rem (19.2px -> 21.12px) */
+  }
+  
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .text-shadow-sm {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+  
+  .elevation-1 {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .elevation-2 {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .elevation-3 {
+    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Enhanced Border Radius Classes - Increased by 10% */
+  .rounded-sm { border-radius: var(--radius-sm) !important; }
+  .rounded { border-radius: var(--radius-default) !important; }
+  .rounded-md { border-radius: var(--radius-md) !important; }
+  .rounded-lg { border-radius: var(--radius-lg) !important; }
+  .rounded-xl { border-radius: var(--radius-xl) !important; }
+
+  /* Card component enhanced radius */
+  .card-rounded { 
+    border-radius: var(--radius-lg) !important; 
+  }
+  
+  /* Button component enhanced radius */  
+  .btn-rounded {
+    border-radius: var(--radius-md) !important;
+  }
+  
+  /* Input component enhanced radius */
+  .input-rounded {
+    border-radius: var(--radius-default) !important; 
+  }
+
+  /* Dropdown visibility fixes */
+  .dropdown-visible {
+    z-index: 200 !important;
+    position: absolute !important;
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+  
+  /* Header dropdown specific fixes */
+  .header-dropdown {
+    z-index: 300 !important;
+    position: fixed !important;
+  }
+}

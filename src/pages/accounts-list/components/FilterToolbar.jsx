@@ -1,0 +1,170 @@
+import React from 'react';
+import Icon from '../../../components/AppIcon';
+import Button from '../../../components/ui/Button';
+import Input from '../../../components/ui/Input';
+import Select from '../../../components/ui/Select';
+
+const FilterToolbar = ({
+  searchTerm,
+  onSearchChange,
+  companyTypeFilter,
+  onCompanyTypeChange,
+  stageFilter,
+  onStageChange,
+  assignedRepFilter,
+  onAssignedRepChange,
+  onClearFilters,
+  resultsCount,
+  totalCount
+}) => {
+  const companyTypeOptions = [
+    { value: '', label: 'All Company Types' },
+    { value: 'Property Management', label: 'Property Management' },
+    { value: 'General Contractor', label: 'General Contractor' },
+    { value: 'Developer', label: 'Developer' },
+    { value: 'REIT/Institutional Investor', label: 'REIT/Institutional Investor' },
+    { value: 'Asset Manager', label: 'Asset Manager' },
+    { value: 'Building Owner', label: 'Building Owner' },
+    { value: 'Facility Manager', label: 'Facility Manager' },
+    { value: 'Roofing Contractor', label: 'Roofing Contractor' },
+    { value: 'Insurance', label: 'Insurance' },
+    { value: 'Architecture/Engineering', label: 'Architecture/Engineering' },
+    { value: 'Other', label: 'Other' }
+  ];
+
+  const stageOptions = [
+    { value: '', label: 'All Stages' },
+    { value: 'Prospect', label: 'Prospect' },
+    { value: 'Contacted', label: 'Contacted' },
+    { value: 'Qualified', label: 'Qualified' },
+    { value: 'Assessment Scheduled', label: 'Assessment Scheduled' },
+    { value: 'Proposal Sent', label: 'Proposal Sent' },
+    { value: 'Won', label: 'Won' },
+    { value: 'Lost', label: 'Lost' }
+  ];
+
+  const assignedRepOptions = [
+    { value: '', label: 'All Representatives' },
+    { value: 'John Smith', label: 'John Smith' },
+    { value: 'Sarah Johnson', label: 'Sarah Johnson' },
+    { value: 'Mike Davis', label: 'Mike Davis' },
+    { value: 'Lisa Chen', label: 'Lisa Chen' },
+    { value: 'David Wilson', label: 'David Wilson' }
+  ];
+
+  const hasActiveFilters = companyTypeFilter || stageFilter || assignedRepFilter || searchTerm;
+
+  return (
+    <div className="bg-card border border-border rounded-lg p-4 space-y-4">
+      {/* Search and Results Count */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex-1 max-w-md">
+          <Input
+            type="search"
+            placeholder="Search accounts..."
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e?.target?.value)}
+            className="w-full"
+          />
+        </div>
+        <div className="flex items-center space-x-4">
+          <span className="text-sm text-muted-foreground">
+            Showing {resultsCount?.toLocaleString()} of {totalCount?.toLocaleString()} accounts
+          </span>
+          {hasActiveFilters && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClearFilters}
+              iconName="X"
+              iconPosition="left"
+            >
+              Clear Filters
+            </Button>
+          )}
+        </div>
+      </div>
+      {/* Filter Controls */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Select
+          placeholder="Filter by company type"
+          options={companyTypeOptions}
+          value={companyTypeFilter}
+          onChange={onCompanyTypeChange}
+          searchable
+        />
+        
+        <Select
+          placeholder="Filter by stage"
+          options={stageOptions}
+          value={stageFilter}
+          onChange={onStageChange}
+        />
+        
+        <Select
+          placeholder="Filter by representative"
+          options={assignedRepOptions}
+          value={assignedRepFilter}
+          onChange={onAssignedRepChange}
+          searchable
+        />
+      </div>
+      {/* Active Filters Display */}
+      {hasActiveFilters && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">Active filters:</span>
+          {searchTerm && (
+            <div className="inline-flex items-center bg-accent/10 text-accent px-2 py-1 rounded-md text-sm">
+              <Icon name="Search" size={12} className="mr-1" />
+              Search: "{searchTerm}"
+              <button
+                onClick={() => onSearchChange('')}
+                className="ml-2 hover:text-accent-foreground"
+              >
+                <Icon name="X" size={12} />
+              </button>
+            </div>
+          )}
+          {companyTypeFilter && (
+            <div className="inline-flex items-center bg-accent/10 text-accent px-2 py-1 rounded-md text-sm">
+              <Icon name="Building2" size={12} className="mr-1" />
+              {companyTypeFilter}
+              <button
+                onClick={() => onCompanyTypeChange('')}
+                className="ml-2 hover:text-accent-foreground"
+              >
+                <Icon name="X" size={12} />
+              </button>
+            </div>
+          )}
+          {stageFilter && (
+            <div className="inline-flex items-center bg-accent/10 text-accent px-2 py-1 rounded-md text-sm">
+              <Icon name="Target" size={12} className="mr-1" />
+              {stageFilter}
+              <button
+                onClick={() => onStageChange('')}
+                className="ml-2 hover:text-accent-foreground"
+              >
+                <Icon name="X" size={12} />
+              </button>
+            </div>
+          )}
+          {assignedRepFilter && (
+            <div className="inline-flex items-center bg-accent/10 text-accent px-2 py-1 rounded-md text-sm">
+              <Icon name="User" size={12} className="mr-1" />
+              {assignedRepFilter}
+              <button
+                onClick={() => onAssignedRepChange('')}
+                className="ml-2 hover:text-accent-foreground"
+              >
+                <Icon name="X" size={12} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default FilterToolbar;
