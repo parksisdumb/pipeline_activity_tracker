@@ -11,10 +11,13 @@ import QuickEntityCreator from './components/QuickEntityCreator';
 import SelectedEntityInfo from './components/SelectedEntityInfo';
 import ActivityFormActions from './components/ActivityFormActions';
 import Icon from '../../components/AppIcon';
+import { useAuth } from '../../contexts/AuthContext';
+import { activitiesService } from '../../services/activitiesService';
 
 const LogActivity = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth(); // Add auth context
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showEntityCreator, setShowEntityCreator] = useState(false);
@@ -34,7 +37,7 @@ const LogActivity = () => {
     formState: { errors, isValid }
   } = useForm({
     defaultValues: {
-      activityType: 'pop_in',
+      activityType: 'Phone Call', // Fixed: Use valid enum value instead of 'pop_in'
       account: '',
       property: '',
       contact: '',
@@ -98,44 +101,103 @@ const LogActivity = () => {
     setIsLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      // Validate required fields
+      if (!data?.activityType) {
+        alert('Please select an activity type');
+        return;
+      }
+
+      if (!data?.account) {
+        alert('Please select an account');
+        return;
+      }
+
+      // Create activity data for database
       const activityData = {
-        ...data,
-        timestamp: new Date()?.toISOString(),
-        user_id: 'user_123',
-        id: `activity_${Date.now()}`
+        activity_type: data?.activityType,
+        account_id: data?.account,
+        contact_id: data?.contact || null,
+        property_id: data?.property || null,
+        outcome: data?.outcome || null,
+        notes: data?.notes || '',
+        activity_date: new Date()?.toISOString(),
+        subject: `${data?.activityType} - ${selectedEntities?.account?.label || 'Account Activity'}`
       };
 
-      console.log('Activity logged:', activityData);
-      
-      // Show success feedback
-      alert('Activity logged successfully!');
-      
-      // Navigate back to previous page or Today screen
-      navigate(-1);
+      // Save to database using the activities service
+      const response = await activitiesService?.createActivity(activityData);
+
+      if (response?.success) {
+        // Show success feedback
+        alert('Activity logged successfully!');
+        
+        // Navigate back to previous page or Today screen
+        navigate('/today');
+      } else {
+        throw new Error(response?.error || 'Failed to save activity');
+      }
       
     } catch (error) {
       console.error('Error logging activity:', error);
-      alert('Failed to log activity. Please try again.');
+      alert(`Failed to log activity: ${error?.message || 'Please try again.'}`);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSaveAndNew = async (data) => {
-    await onSubmit(data);
+    setIsLoading(true);
     
-    // Reset form for new entry but keep entity selections for efficiency
-    reset({
-      activityType: 'pop_in',
-      account: watchedValues?.account,
-      property: watchedValues?.property,
-      contact: watchedValues?.contact,
-      outcome: '',
-      notes: ''
-    });
+    try {
+      // Validate required fields
+      if (!data?.activityType) {
+        alert('Please select an activity type');
+        return;
+      }
+
+      if (!data?.account) {
+        alert('Please select an account');
+        return;
+      }
+
+      // Create activity data for database
+      const activityData = {
+        activity_type: data?.activityType,
+        account_id: data?.account,
+        contact_id: data?.contact || null,
+        property_id: data?.property || null,
+        outcome: data?.outcome || null,
+        notes: data?.notes || '',
+        activity_date: new Date()?.toISOString(),
+        subject: `${data?.activityType} - ${selectedEntities?.account?.label || 'Account Activity'}`
+      };
+
+      // Save to database using the activities service
+      const response = await activitiesService?.createActivity(activityData);
+
+      if (response?.success) {
+        // Show success feedback
+        alert('Activity logged successfully!');
+        
+        // Reset form for new entry but keep entity selections for efficiency
+        reset({
+          activityType: 'Phone Call', // Fixed: Use valid enum value instead of 'pop_in'
+          account: watchedValues?.account,
+          property: watchedValues?.property,
+          contact: watchedValues?.contact,
+          outcome: '',
+          notes: ''
+        });
+      } else {
+        throw new Error(response?.error || 'Failed to save activity');
+      }
+      
+    } catch (error) {
+      console.error('Error logging activity:', error);
+      alert(`Failed to log activity: ${error?.message || 'Please try again.'}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCancel = () => {

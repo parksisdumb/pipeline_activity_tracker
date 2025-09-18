@@ -51,8 +51,7 @@
     --color-destructive: #dc2626; /* red-600 */
     --color-destructive-foreground: #ffffff; /* white */
     
-    /* Border Radius Variables - Fix missing --radius */
-    --radius: 0.5rem; /* 8px - Base radius for Tailwind config */
+    /* Enhanced Border Radius - Increased by 10% */
     --radius-sm: 0.33rem; /* was 0.3rem (3px -> 3.3px) */
     --radius-default: 0.44rem; /* was 0.4rem (4px -> 4.4px) */  
     --radius-md: 0.55rem; /* was 0.5rem (8px -> 8.8px) */
@@ -107,20 +106,5 @@
   /* Input component enhanced radius */
   .input-rounded {
     border-radius: var(--radius-default) !important; 
-  }
-
-  /* Dropdown visibility fixes */
-  .dropdown-visible {
-    z-index: 200 !important;
-    position: absolute !important;
-    display: block !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-  }
-  
-  /* Header dropdown specific fixes */
-  .header-dropdown {
-    z-index: 300 !important;
-    position: fixed !important;
   }
 }

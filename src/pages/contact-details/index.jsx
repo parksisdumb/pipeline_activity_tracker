@@ -9,148 +9,113 @@ import ProfileEditor from './components/ProfileEditor';
 import QuickActions from './components/QuickActions';
 import RelationshipMap from './components/RelationshipMap';
 import { contactsService } from '../../services/contactsService';
-import { activitiesService } from '../../services/activitiesService';
+import Icon from '../../components/AppIcon';
+import Button from '../../components/ui/Button';
 
 const ContactDetails = () => {
-  const { id } = useParams();
+  const { id: contactId } = useParams(); // Fixed: Extract 'id' and rename to 'contactId'
   const navigate = useNavigate();
   const [contact, setContact] = useState(null);
-  const [activities, setActivities] = useState([]);
-  const [relatedContacts, setRelatedContacts] = useState([]);
-  const [activeTab, setActiveTab] = useState('activities');
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [activities, setActivities] = useState([]);
+  const [relatedContacts, setRelatedContacts] = useState([]);
 
-  // Mock data for contact details - in a real app this would come from the database
-  const mockContactData = {
-    id: parseInt(id),
-    name: "Sarah Johnson",
-    firstName: "Sarah",
-    lastName: "Johnson",
-    email: "sarah.johnson@westfieldproperties.com",
-    phone: "(555) 123-4567",
-    mobilePhone: "(555) 987-6543",
-    role: "Property Manager",
-    title: "Senior Property Manager",
-    account: "Westfield Properties",
-    accountId: 1,
-    property: "Westfield Industrial Complex",
-    propertyId: 1,
-    stage: "Engaged",
-    lastInteraction: new Date(2025, 8, 3),
-    createdAt: new Date(2025, 7, 15),
-    updatedAt: new Date(2025, 8, 3),
-    isPrimaryContact: true,
-    notes: "Key decision maker for property management decisions. Very responsive to emails and prefers morning calls.",
-    linkedInUrl: "https://linkedin.com/in/sarahjohnson",
-    companyWebsite: "https://westfieldproperties.com",
-    address: "123 Business Park Drive, Suite 200, Atlanta, GA 30309",
-    department: "Operations",
-    reportsTo: "Michael Thompson - VP of Operations",
-    decisionMakingAuthority: "High",
-    preferredCommunication: "Email",
-    timeZone: "EST"
-  };
-
-  const mockActivities = [
-    {
-      id: 1,
-      type: "Email",
-      subject: "Follow-up on HVAC maintenance proposal",
-      description: "Sent detailed proposal for HVAC maintenance contract renewal. Included pricing options and timeline.",
-      outcome: "Positive",
-      date: new Date(2025, 8, 3, 14, 30),
-      duration: 30,
-      nextAction: "Call to discuss proposal",
-      nextActionDate: new Date(2025, 8, 5)
-    },
-    {
-      id: 2,
-      type: "Phone Call",
-      subject: "Quarterly check-in call",
-      description: "Discussed current facility needs and upcoming projects. Sarah mentioned interest in energy efficiency upgrades.",
-      outcome: "Engaged",
-      date: new Date(2025, 7, 28, 10, 0),
-      duration: 45,
-      nextAction: "Send energy audit proposal",
-      nextActionDate: new Date(2025, 8, 2)
-    },
-    {
-      id: 3,
-      type: "Meeting",
-      subject: "Site visit and facility walkthrough",
-      description: "Conducted comprehensive facility assessment. Identified 3 immediate maintenance opportunities.",
-      outcome: "Very Positive",
-      date: new Date(2025, 7, 20, 9, 0),
-      duration: 120,
-      nextAction: "Prepare maintenance proposal",
-      nextActionDate: new Date(2025, 7, 25)
-    },
-    {
-      id: 4,
-      type: "Email",
-      subject: "Introduction and company overview",
-      description: "Initial outreach email introducing our services and requesting a brief call to discuss their facility needs.",
-      outcome: "Neutral",
-      date: new Date(2025, 7, 15, 16, 0),
-      duration: 15,
-      nextAction: "Follow-up call",
-      nextActionDate: new Date(2025, 7, 18)
-    }
-  ];
-
-  const mockRelatedContacts = [
-    {
-      id: 2,
-      name: "Michael Thompson",
-      role: "VP of Operations",
-      relationship: "Reports To",
-      influence: "High",
-      lastInteraction: new Date(2025, 7, 25)
-    },
-    {
-      id: 3,
-      name: "Jennifer Davis",
-      role: "Facility Coordinator", 
-      relationship: "Works With",
-      influence: "Medium",
-      lastInteraction: new Date(2025, 7, 30)
-    },
-    {
-      id: 4,
-      name: "Robert Kim",
-      role: "Maintenance Supervisor",
-      relationship: "Collaborates With",
-      influence: "Medium",
-      lastInteraction: new Date(2025, 8, 1)
-    }
-  ];
-
+  // Enhanced parameter validation with better error handling
   useEffect(() => {
-    loadContactData();
-  }, [id]);
-
-  const loadContactData = async () => {
-    if (!id) {
+    if (!contactId) {
+      console.error('No contact ID provided in URL');
       setError('Contact ID is required');
       setLoading(false);
       return;
     }
 
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex?.test(contactId)) {
+      console.error('Invalid contact ID format in URL:', contactId);
+      setError('Invalid contact ID format');
+      setLoading(false);
+      return;
+    }
+
+    // Load contact details
+    loadContactDetails();
+  }, [contactId]);
+
+  // Enhanced loadContactDetails with better error handling
+  const loadContactDetails = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // In a real app, this would fetch from the database
-      // const contactResult = await contactsService.getContact(id);
-      // const activitiesResult = await activitiesService.getActivities({ contactId: id });
+      // Call the actual contacts service to get real data from database
+      const result = await contactsService?.getContact(contactId);
       
-      // Using mock data for now
-      setContact(mockContactData);
-      setActivities(mockActivities);
-      setRelatedContacts(mockRelatedContacts);
+      if (result?.success && result?.data) {
+        // Transform database data to match the expected format
+        const contactData = {
+          id: result?.data?.id,
+          name: `${result?.data?.first_name || ''} ${result?.data?.last_name || ''}`?.trim(),
+          firstName: result?.data?.first_name || '',
+          lastName: result?.data?.last_name || '',
+          email: result?.data?.email || '',
+          phone: result?.data?.phone || '',
+          mobilePhone: result?.data?.mobile_phone || '',
+          role: result?.data?.title || 'Contact',
+          title: result?.data?.title || '',
+          account: result?.data?.account?.name || 'Unknown Account',
+          accountId: result?.data?.account_id,
+          property: null, // Properties are not directly linked in current schema
+          propertyId: result?.data?.property_id,
+          stage: result?.data?.stage || 'Identified',
+          lastInteraction: result?.data?.updated_at ? new Date(result?.data?.updated_at) : new Date(result?.data?.created_at),
+          createdAt: new Date(result?.data?.created_at),
+          updatedAt: new Date(result?.data?.updated_at || result?.data?.created_at),
+          isPrimaryContact: result?.data?.is_primary_contact || false,
+          notes: result?.data?.notes || '',
+          // Additional fields that might not be in database - provide fallbacks
+          linkedInUrl: '',
+          companyWebsite: result?.data?.account?.website || '',
+          address: result?.data?.account?.address || '',
+          department: '',
+          reportsTo: '',
+          decisionMakingAuthority: 'Unknown',
+          preferredCommunication: 'Email',
+          timeZone: 'EST'
+        };
+
+        setContact(contactData);
+        console.log('Contact loaded successfully:', contactData);
+        
+        // Load related activities if available
+        if (result?.data?.activities) {
+          const transformedActivities = result?.data?.activities?.map(activity => ({
+            id: activity?.id,
+            type: activity?.type || 'General',
+            subject: activity?.description?.split('.')?.[0] || 'Contact Activity',
+            description: activity?.description || '',
+            outcome: activity?.outcome || 'Pending',
+            date: new Date(activity?.created_at),
+            duration: 30, // Default duration
+            nextAction: '',
+            nextActionDate: null
+          })) || [];
+          
+          setActivities(transformedActivities);
+        } else {
+          setActivities([]);
+        }
+        
+        // Set empty related contacts for now (could be enhanced later)
+        setRelatedContacts([]);
+      } else {
+        throw new Error(result?.error || 'Contact not found');
+      }
     } catch (err) {
+      console.error('Error loading contact:', err);
       setError(err?.message || 'Failed to load contact details');
     } finally {
       setLoading(false);
@@ -159,23 +124,60 @@ const ContactDetails = () => {
 
   const handleStageUpdate = async (newStage) => {
     try {
-      // In a real app, this would update the database
-      // await contactsService.updateContact(id, { stage: newStage });
-      setContact(prev => ({ ...prev, stage: newStage, updatedAt: new Date() }));
+      // Update the database with the new stage
+      const result = await contactsService?.updateContact(contactId, { stage: newStage });
+      
+      if (result?.success) {
+        setContact(prev => ({ ...prev, stage: newStage, updatedAt: new Date() }));
+      } else {
+        throw new Error(result?.error || 'Failed to update stage');
+      }
     } catch (err) {
       console.error('Failed to update stage:', err);
+      // Show error to user - in a real app, you'd want a toast notification
+      alert('Failed to update contact stage. Please try again.');
     }
   };
 
   const handleProfileUpdate = async (updates) => {
     try {
-      // In a real app, this would update the database
-      // await contactsService.updateContact(id, updates);
-      setContact(prev => ({ ...prev, ...updates, updatedAt: new Date() }));
-      setIsEditingProfile(false);
+      // Convert UI format back to database format
+      const dbUpdates = {
+        first_name: updates?.firstName,
+        last_name: updates?.lastName,
+        email: updates?.email,
+        phone: updates?.phone,
+        mobile_phone: updates?.mobilePhone,
+        title: updates?.title,
+        notes: updates?.notes,
+        stage: updates?.stage
+      };
+
+      // Remove undefined values
+      Object.keys(dbUpdates)?.forEach(key => {
+        if (dbUpdates?.[key] === undefined) {
+          delete dbUpdates?.[key];
+        }
+      });
+
+      const result = await contactsService?.updateContact(contactId, dbUpdates);
+      
+      if (result?.success) {
+        setContact(prev => ({ ...prev, ...updates, updatedAt: new Date() }));
+        setIsEditingProfile(false);
+      } else {
+        throw new Error(result?.error || 'Failed to update contact');
+      }
     } catch (err) {
       console.error('Failed to update profile:', err);
+      // Show error to user - in a real app, you'd want a toast notification
+      alert('Failed to update contact profile. Please try again.');
     }
+  };
+
+  const handleContactUpdate = () => {
+    // Reload contact data when updates occur
+    loadContactDetails();
   };
 
   const handleActivityLog = (activityData) => {
@@ -209,6 +211,7 @@ const ContactDetails = () => {
     }
   };
 
+  // Enhanced loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -219,6 +222,7 @@ const ContactDetails = () => {
               <div className="text-center">
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                 <p className="text-muted-foreground">Loading contact details...</p>
+                <p className="text-sm text-muted-foreground mt-2">ID: {contactId}</p>
               </div>
             </div>
           </div>
@@ -227,6 +231,7 @@ const ContactDetails = () => {
     );
   }
 
+  // Enhanced error state
   if (error) {
     return (
       <div className="min-h-screen bg-background">
@@ -234,13 +239,29 @@ const ContactDetails = () => {
         <div className="pt-16 px-4 py-8">
           <div className="max-w-7xl mx-auto">
             <div className="text-center py-12">
-              <p className="text-destructive mb-4">{error}</p>
-              <button
-                onClick={() => navigate('/contacts-list')}
-                className="text-primary hover:underline"
-              >
-                Back to Contacts List
-              </button>
+              <div className="mb-6">
+                <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Icon name="AlertTriangle" size={24} className="text-destructive" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">Unable to Load Contact</h2>
+                <p className="text-destructive mb-4">{error}</p>
+                <p className="text-sm text-muted-foreground mb-6">Contact ID: {contactId}</p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button
+                  variant="outline"
+                  onClick={() => loadContactDetails()}
+                >
+                  <Icon name="RefreshCw" size={16} className="mr-2" />
+                  Try Again
+                </Button>
+                <Button
+                  onClick={() => navigate('/contacts-list')}
+                >
+                  <Icon name="ArrowLeft" size={16} className="mr-2" />
+                  Back to Contacts
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -248,6 +269,7 @@ const ContactDetails = () => {
     );
   }
 
+  // Enhanced not found state
   if (!contact) {
     return (
       <div className="min-h-screen bg-background">
@@ -255,13 +277,20 @@ const ContactDetails = () => {
         <div className="pt-16 px-4 py-8">
           <div className="max-w-7xl mx-auto">
             <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">Contact not found</p>
-              <button
+              <div className="mb-6">
+                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Icon name="UserX" size={24} className="text-muted-foreground" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">Contact Not Found</h2>
+                <p className="text-muted-foreground mb-4">The requested contact could not be found.</p>
+                <p className="text-sm text-muted-foreground mb-6">ID: {contactId}</p>
+              </div>
+              <Button
                 onClick={() => navigate('/contacts-list')}
-                className="text-primary hover:underline"
               >
+                <Icon name="ArrowLeft" size={16} className="mr-2" />
                 Back to Contacts List
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -303,6 +332,7 @@ const ContactDetails = () => {
                 onActivityLog={handleActivityLog}
                 onPhoneCall={() => handlePhoneCall(contact?.phone)}
                 onEmail={() => handleEmail(contact?.email)}
+                onContactUpdate={handleContactUpdate}
               />
             </div>
 

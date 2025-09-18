@@ -44,24 +44,30 @@ const AddContactModal = ({ isOpen, onClose, onContactAdded, preselectedAccountId
     setLoadingAccounts(true);
     setError(''); // Clear any previous errors
     try {
+      console.log('Loading accounts for contact creation...');
       const result = await accountsService?.getAccounts();
       if (result?.success) {
         setAccounts(result?.data || []);
         
-        // Debug: Log account loading results
-        console.log('Accounts loaded:', result?.data?.length, 'accounts');
+        // Enhanced debugging for account loading issues
+        console.log('Accounts loaded successfully:', result?.data?.length, 'accounts');
+        console.log('Account details:', result?.data?.map(acc => ({ 
+          id: acc?.id, 
+          name: acc?.name, 
+          tenant_id: acc?.tenant_id 
+        })));
         
         // Show helpful message if no accounts available
         if (!result?.data || result?.data?.length === 0) {
-          setError('No accounts available. You may need to create an account first or contact your administrator.');
+          setError('No accounts available for your organization (FOX roofing). You may need to create an account first or contact your administrator to verify your permissions.');
         }
       } else {
         console.error('Failed to load accounts:', result?.error);
-        setError(result?.error || 'Failed to load accounts. Please try again.');
+        setError(`Failed to load accounts: ${result?.error || 'Unknown error'}. Please try refreshing the page or contact support.`);
       }
     } catch (err) {
       console.error('Load accounts error:', err);
-      setError('Unable to load accounts. Please check your connection and try again.');
+      setError('Unable to load accounts. Please check your connection and try again. If the problem persists, contact support.');
     } finally {
       setLoadingAccounts(false);
     }
@@ -104,17 +110,41 @@ const AddContactModal = ({ isOpen, onClose, onContactAdded, preselectedAccountId
     setError('');
 
     try {
+      // Enhanced debugging for Tyler Fox's issue 
+      console.log('=== CONTACT FORM SUBMISSION ===');
+      console.log('Form data:', formData);
+      console.log('Selected account ID:', formData?.account_id);
+      
+      // Find selected account info for debugging
+      const selectedAccount = accounts?.find(acc => acc?.id === formData?.account_id);
+      console.log('Selected account details:', selectedAccount);
+
       const result = await contactsService?.createContact(formData);
       
       if (result?.success) {
+        console.log('Contact creation successful!');
         onContactAdded?.(result?.data);
         handleClose();
       } else {
-        setError(result?.error || 'Failed to create contact');
+        console.error('Contact creation failed:', result?.error);
+        
+        // Enhanced error display with debugging info for admins
+        let errorMessage = result?.error || 'Failed to create contact';
+        
+        // Add debugging information for FOX roofing tenant issues
+        if (errorMessage?.includes('tenant') || errorMessage?.includes('access')) {
+          errorMessage += '\n\n🔧 Debug Info:\n';
+          errorMessage += `- User: ${formData?.email || 'Unknown'}\n`;
+          errorMessage += `- Selected Account: ${selectedAccount?.name || 'Unknown'}\n`;
+          errorMessage += `- Available Accounts: ${accounts?.length || 0}\n`;
+          errorMessage += '- Contact support with this information if the issue persists.';
+        }
+        
+        setError(errorMessage);
       }
     } catch (err) {
-      setError('An unexpected error occurred');
-      console.error('Create contact error:', err);
+      console.error('Unexpected error in contact creation:', err);
+      setError('An unexpected error occurred. Please try again or contact support.');
     } finally {
       setLoading(false);
     }
@@ -232,7 +262,7 @@ const AddContactModal = ({ isOpen, onClose, onContactAdded, preselectedAccountId
             name="account_id"
             label="Account *"
             value={formData?.account_id}
-            onChange={(e) => handleInputChange('account_id', e?.target?.value)}
+            onChange={(value) => handleInputChange('account_id', value)}
             onSearchChange={() => {}}
             onOpenChange={() => {}}
             options={accountOptions}
@@ -248,11 +278,6 @@ const AddContactModal = ({ isOpen, onClose, onContactAdded, preselectedAccountId
             loading={loadingAccounts}
             error=""
             description=""
-            emptyMessage={
-              loadingAccounts 
-                ? "Loading accounts..." 
-                : "No accounts found. Please create an account first."
-            }
           />
 
           <Select
@@ -260,7 +285,7 @@ const AddContactModal = ({ isOpen, onClose, onContactAdded, preselectedAccountId
             name="stage"
             label="Contact Stage"
             value={formData?.stage}
-            onChange={(e) => handleInputChange('stage', e?.target?.value)}
+            onChange={(value) => handleInputChange('stage', value)}
             onSearchChange={() => {}}
             onOpenChange={() => {}}
             options={stageOptions}

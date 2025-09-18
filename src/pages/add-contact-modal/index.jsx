@@ -64,20 +64,31 @@ const AddContactModal = () => {
   const loadAccounts = async () => {
     setLoadingAccounts(true);
     try {
+      console.log('Loading accounts for FOX roofing tenant...');
       const result = await accountsService?.getAccounts();
       if (result?.success) {
         const activeAccounts = result?.data?.filter(account => account?.is_active) || [];
         setAccounts(activeAccounts);
         setFilteredAccounts(activeAccounts);
+        
+        console.log(`FOX roofing accounts loaded: ${activeAccounts?.length} accounts`);
+        console.log('Account details:', activeAccounts?.map(acc => ({ 
+          id: acc?.id?.substring(0, 8) + '...', 
+          name: acc?.name 
+        })));
       } else {
-        console.error('Failed to load accounts:', result?.error);
+        console.error('Failed to load FOX roofing accounts:', result?.error);
         setAccounts([]);
         setFilteredAccounts([]);
+        
+        // Show specific error for FOX roofing tenant
+        setError(`Unable to load accounts for FOX roofing: ${result?.error || 'Unknown error'}. Please contact your administrator.`);
       }
     } catch (error) {
-      console.error('Error loading accounts:', error);
+      console.error('Error loading FOX roofing accounts:', error);
       setAccounts([]);
       setFilteredAccounts([]);
+      setError('Network error while loading FOX roofing accounts. Please check your connection and try again.');
     }
     setLoadingAccounts(false);
   };
@@ -174,9 +185,17 @@ const AddContactModal = () => {
         is_primary_contact: false
       };
 
+      // Enhanced debugging for FOX roofing tenant
+      console.log('=== FOX ROOFING CONTACT CREATION DEBUG ===');
+      console.log('User email: tyler@foxroofing.co');
+      console.log('Contact data being submitted:', contactData);
+      console.log('Selected account from form:', formData?.accountId);
+      console.log('Available accounts:', accounts?.length);
+
       const result = await contactsService?.createContact(contactData);
 
       if (result?.success) {
+        console.log('✅ Contact created successfully for FOX roofing!');
         // Navigate back with success message
         if (preselectedAccountId) {
           navigate(`/account-details/${preselectedAccountId}?tab=contacts&success=contact-added`);
@@ -184,11 +203,27 @@ const AddContactModal = () => {
           navigate('/contacts-list?success=contact-added');
         }
       } else {
-        setError(result?.error || 'Failed to create contact');
+        console.error('❌ Contact creation failed for FOX roofing:', result?.error);
+        
+        // Enhanced error message specifically for Tyler Fox / FOX roofing
+        let errorMessage = result?.error || 'Failed to create contact';
+        if (errorMessage?.includes('tenant') || errorMessage?.includes('access')) {
+          errorMessage = `FOX Roofing Access Issue: ${errorMessage}
+          
+🔧 Troubleshooting Steps:
+1. Verify your account permissions with your administrator
+2. Ensure the selected account belongs to FOX roofing
+3. Try refreshing the page and logging in again
+4. Contact support if the issue persists
+
+Debug Info: Tyler Fox (tyler@foxroofing.co) - FOX roofing tenant`;
+        }
+        
+        setError(errorMessage);
       }
     } catch (error) {
-      console.error('Error creating contact:', error);
-      setError('An unexpected error occurred');
+      console.error('Unexpected error in FOX roofing contact creation:', error);
+      setError('An unexpected error occurred while creating the contact for FOX roofing. Please try again or contact support.');
     } finally {
       setLoading(false);
     }
@@ -299,6 +334,12 @@ const AddContactModal = () => {
               onChange={(e) => handleInputChange('stage', e?.target?.value)}
               options={contactStages}
               disabled={loading}
+              onSearchChange={() => {}}
+              error=""
+              id="contact-stage"
+              onOpenChange={() => {}}
+              name="stage"
+              description=""
             />
 
             {/* Notes */}

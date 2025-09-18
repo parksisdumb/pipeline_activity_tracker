@@ -42,6 +42,21 @@ const PropertyDetails = () => {
       return;
     }
 
+    // Add validation for route parameter issues
+    if (id === ':id' || id?.includes(':id')) {
+      setError('Invalid property ID. Please navigate from the properties list.');
+      setLoading(false);
+      return;
+    }
+
+    // Add UUID format validation
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex?.test(id)) {
+      setError('Invalid property ID format. Please check the URL and try again.');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 

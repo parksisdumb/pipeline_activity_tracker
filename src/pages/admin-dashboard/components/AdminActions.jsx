@@ -1,36 +1,99 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import Modal from '../../../components/ui/Modal';
-import { authService } from '../../../services/authService';
+
 import { adminService } from '../../../services/adminService';
 
 const AdminActions = ({ onRefresh }) => {
   const [isCreateOrgModalOpen, setIsCreateOrgModalOpen] = useState(false);
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [availableOrganizations, setAvailableOrganizations] = useState([]);
   
-  // Create Organization Form State
+  // Create Organization Form State - Fixed to match tenants table schema
   const [newOrg, setNewOrg] = useState({
     name: '',
-    company_type: 'Property Management',
-    email: '',
-    phone: '',
+    slug: '',
+    description: '',
+    contact_email: '',
+    contact_phone: '',
     city: '',
     state: '',
-    address: '',
-    zip_code: ''
+    country: 'US',
+    address_line_1: '',
+    address_line_2: '',
+    postal_code: '',
+    subscription_plan: 'free',
+    status: 'trial',
+    max_users: 5,
+    max_accounts: 100,
+    max_properties: 500,
+    max_storage_mb: 1000,
+    owner_id: '' // Add owner_id field
   });
 
-  // Create User Form State
+  // Create User Form State - Updated to include tenant organization
   const [newUser, setNewUser] = useState({
     email: '',
     full_name: '',
     role: 'rep',
-    phone: ''
+    phone: '',
+    tenant_id: '' // Add tenant organization selection
   });
+
+  // Load available users when component mounts or when create org modal opens
+  useEffect(() => {
+    if (isCreateOrgModalOpen) {
+      loadAvailableUsers();
+    }
+  }, [isCreateOrgModalOpen]);
+
+  // Load available organizations when create user modal opens
+  useEffect(() => {
+    if (isCreateUserModalOpen) {
+      loadAvailableOrganizations();
+    }
+  }, [isCreateUserModalOpen]);
+
+  const loadAvailableUsers = async () => {
+    try {
+      const result = await adminService?.getAllUsers();
+      if (result?.success) {
+        const userOptions = result?.data?.map(user => ({
+          value: user?.id,
+          label: `${user?.full_name} (${user?.email}) - ${user?.role}`
+        })) || [];
+        setAvailableUsers(userOptions);
+        
+        // Set current user as default owner if no owner is selected
+        const currentUser = result?.data?.find(user => user?.role === 'admin');
+        if (currentUser && !newOrg?.owner_id) {
+          setNewOrg(prev => ({ ...prev, owner_id: currentUser?.id }));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading users:', error);
+    }
+  };
+
+  const loadAvailableOrganizations = async () => {
+    try {
+      const result = await adminService?.getAllOrganizations();
+      if (result?.success) {
+        const orgOptions = result?.data?.map(org => ({
+          value: org?.id,
+          label: `${org?.name} (${org?.status?.toUpperCase()})`
+        })) || [];
+        setAvailableOrganizations(orgOptions);
+      }
+    } catch (error) {
+      console.error('Error loading organizations:', error);
+    }
+  };
 
   const companyTypes = [
     'Property Management', 'General Contractor', 'Developer', 
@@ -44,10 +107,43 @@ const AdminActions = ({ onRefresh }) => {
     { value: 'rep', label: 'Representative' }
   ];
 
+  const subscriptionPlans = [
+    { value: 'free', label: 'Free' },
+    { value: 'basic', label: 'Basic' },
+    { value: 'pro', label: 'Pro' },
+    { value: 'enterprise', label: 'Enterprise' },
+    { value: 'custom', label: 'Custom' }
+  ];
+
+  const tenantStatuses = [
+    { value: 'trial', label: 'Trial' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+    { value: 'suspended', label: 'Suspended' },
+    { value: 'expired', label: 'Expired' }
+  ];
+
   const handleCreateOrganization = async () => {
     if (!newOrg?.name?.trim()) {
       alert('Organization name is required');
       return;
+    }
+
+    if (!newOrg?.owner_id?.trim()) {
+      alert('Organization owner is required');
+      return;
+    }
+
+    // Generate slug from name if not provided
+    if (!newOrg?.slug?.trim()) {
+      const generatedSlug = newOrg?.name
+        ?.toLowerCase()
+        ?.replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+        ?.replace(/\s+/g, '-') // Replace spaces with hyphens
+        ?.replace(/-+/g, '-') // Replace multiple hyphens with single
+        ?.trim();
+      
+      newOrg.slug = generatedSlug;
     }
 
     setLoading(true);
@@ -57,13 +153,23 @@ const AdminActions = ({ onRefresh }) => {
         setIsCreateOrgModalOpen(false);
         setNewOrg({
           name: '',
-          company_type: 'Property Management',
-          email: '',
-          phone: '',
+          slug: '',
+          description: '',
+          contact_email: '',
+          contact_phone: '',
           city: '',
           state: '',
-          address: '',
-          zip_code: ''
+          country: 'US',
+          address_line_1: '',
+          address_line_2: '',
+          postal_code: '',
+          subscription_plan: 'free',
+          status: 'trial',
+          max_users: 5,
+          max_accounts: 100,
+          max_properties: 500,
+          max_storage_mb: 1000,
+          owner_id: ''
         });
         await onRefresh?.();
         alert('Organization created successfully!');
@@ -72,7 +178,7 @@ const AdminActions = ({ onRefresh }) => {
       }
     } catch (error) {
       console.error('Error creating organization:', error);
-      alert('Error creating organization');
+      alert(`Error creating organization: ${error?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -86,20 +192,8 @@ const AdminActions = ({ onRefresh }) => {
 
     setLoading(true);
     try {
-      // Create user through auth service with temporary password
-      const tempPassword = 'TempPass123!'; // User should change this on first login
-      
-      const result = await authService?.signUp({
-        email: newUser?.email,
-        password: tempPassword,
-        options: {
-          data: {
-            full_name: newUser?.full_name,
-            role: newUser?.role,
-            phone: newUser?.phone || null
-          }
-        }
-      });
+      // Use the new createUserWithTenant method that handles organization assignment
+      const result = await adminService?.createUserWithTenant(newUser);
 
       if (result?.success) {
         setIsCreateUserModalOpen(false);
@@ -107,10 +201,25 @@ const AdminActions = ({ onRefresh }) => {
           email: '',
           full_name: '',
           role: 'rep',
-          phone: ''
+          phone: '',
+          tenant_id: ''
         });
+        
+        // Show success message with temporary password and any warnings
+        const message = result?.warning 
+          ? `${result?.warning}\nTemporary password: ${result?.tempPassword}`
+          : `User created successfully! Temporary password: ${result?.tempPassword}`;
+        alert(message);
+        
+        // Force refresh the dashboard data
+        console.log('User created, refreshing dashboard data...');
         await onRefresh?.();
-        alert(`User created successfully! Temporary password: ${tempPassword}`);
+        
+        // Additional delay to ensure data propagation
+        setTimeout(async () => {
+          await onRefresh?.();
+          console.log('Dashboard data refreshed after user creation');
+        }, 1000);
       } else {
         alert(result?.error || 'Failed to create user');
       }
@@ -234,7 +343,7 @@ const AdminActions = ({ onRefresh }) => {
         </div>
       </div>
 
-      {/* Create Organization Modal */}
+      {/* Create Organization Modal - Updated with owner selection */}
       <Modal
         isOpen={isCreateOrgModalOpen}
         onClose={() => setIsCreateOrgModalOpen(false)}
@@ -250,37 +359,61 @@ const AdminActions = ({ onRefresh }) => {
           />
           
           <Select
-            label="Company Type"
-            value={newOrg?.company_type}
-            onChange={(value) => setNewOrg({ ...newOrg, company_type: value })}
-            options={companyTypes?.map(type => ({ value: type, label: type }))}
+            label="Organization Owner *"
+            value={newOrg?.owner_id}
+            onChange={(value) => setNewOrg({ ...newOrg, owner_id: value })}
+            options={availableUsers}
+            placeholder="Select organization owner"
+            required
+          />
+          
+          <Input
+            label="Slug"
+            value={newOrg?.slug}
+            onChange={(e) => setNewOrg({ ...newOrg, slug: e?.target?.value?.toLowerCase()?.replace(/[^a-z0-9-]/g, '') })}
+            placeholder="Auto-generated from name (e.g. acme-corp)"
+            helperText="Used for URLs and identification. Will be auto-generated if left empty."
+          />
+          
+          <Input
+            label="Description"
+            value={newOrg?.description}
+            onChange={(e) => setNewOrg({ ...newOrg, description: e?.target?.value })}
+            placeholder="Brief description of the organization"
           />
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Email"
+              label="Contact Email"
               type="email"
-              value={newOrg?.email}
-              onChange={(e) => setNewOrg({ ...newOrg, email: e?.target?.value })}
-              placeholder="Enter email address"
+              value={newOrg?.contact_email}
+              onChange={(e) => setNewOrg({ ...newOrg, contact_email: e?.target?.value })}
+              placeholder="Enter contact email"
             />
             
             <Input
-              label="Phone"
-              value={newOrg?.phone}
-              onChange={(e) => setNewOrg({ ...newOrg, phone: e?.target?.value })}
-              placeholder="Enter phone number"
+              label="Contact Phone"
+              value={newOrg?.contact_phone}
+              onChange={(e) => setNewOrg({ ...newOrg, contact_phone: e?.target?.value })}
+              placeholder="Enter contact phone"
             />
           </div>
           
           <Input
-            label="Address"
-            value={newOrg?.address}
-            onChange={(e) => setNewOrg({ ...newOrg, address: e?.target?.value })}
+            label="Address Line 1"
+            value={newOrg?.address_line_1}
+            onChange={(e) => setNewOrg({ ...newOrg, address_line_1: e?.target?.value })}
             placeholder="Enter street address"
           />
           
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <Input
+            label="Address Line 2"
+            value={newOrg?.address_line_2}
+            onChange={(e) => setNewOrg({ ...newOrg, address_line_2: e?.target?.value })}
+            placeholder="Apartment, suite, etc. (optional)"
+          />
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Input
               label="City"
               value={newOrg?.city}
@@ -296,10 +429,71 @@ const AdminActions = ({ onRefresh }) => {
             />
             
             <Input
-              label="ZIP Code"
-              value={newOrg?.zip_code}
-              onChange={(e) => setNewOrg({ ...newOrg, zip_code: e?.target?.value })}
+              label="ZIP/Postal Code"
+              value={newOrg?.postal_code}
+              onChange={(e) => setNewOrg({ ...newOrg, postal_code: e?.target?.value })}
               placeholder="ZIP"
+            />
+            
+            <Select
+              label="Country"
+              value={newOrg?.country}
+              onChange={(value) => setNewOrg({ ...newOrg, country: value })}
+              options={[
+                { value: 'US', label: 'United States' },
+                { value: 'CA', label: 'Canada' },
+                { value: 'MX', label: 'Mexico' }
+              ]}
+            />
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select
+              label="Subscription Plan"
+              value={newOrg?.subscription_plan}
+              onChange={(value) => setNewOrg({ ...newOrg, subscription_plan: value })}
+              options={subscriptionPlans}
+            />
+            
+            <Select
+              label="Status"
+              value={newOrg?.status}
+              onChange={(value) => setNewOrg({ ...newOrg, status: value })}
+              options={tenantStatuses}
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Input
+              label="Max Users"
+              type="number"
+              value={newOrg?.max_users}
+              onChange={(e) => setNewOrg({ ...newOrg, max_users: parseInt(e?.target?.value) || 5 })}
+              placeholder="5"
+            />
+            
+            <Input
+              label="Max Accounts"
+              type="number"
+              value={newOrg?.max_accounts}
+              onChange={(e) => setNewOrg({ ...newOrg, max_accounts: parseInt(e?.target?.value) || 100 })}
+              placeholder="100"
+            />
+            
+            <Input
+              label="Max Properties"
+              type="number"
+              value={newOrg?.max_properties}
+              onChange={(e) => setNewOrg({ ...newOrg, max_properties: parseInt(e?.target?.value) || 500 })}
+              placeholder="500"
+            />
+            
+            <Input
+              label="Storage (MB)"
+              type="number"
+              value={newOrg?.max_storage_mb}
+              onChange={(e) => setNewOrg({ ...newOrg, max_storage_mb: parseInt(e?.target?.value) || 1000 })}
+              placeholder="1000"
             />
           </div>
           
@@ -322,7 +516,7 @@ const AdminActions = ({ onRefresh }) => {
         </div>
       </Modal>
 
-      {/* Create User Modal */}
+      {/* Create User Modal - Updated with organization selection */}
       <Modal
         isOpen={isCreateUserModalOpen}
         onClose={() => setIsCreateUserModalOpen(false)}
@@ -361,6 +555,15 @@ const AdminActions = ({ onRefresh }) => {
               placeholder="Enter phone number"
             />
           </div>
+          
+          <Select
+            label="Tenant Organization"
+            value={newUser?.tenant_id}
+            onChange={(value) => setNewUser({ ...newUser, tenant_id: value })}
+            options={availableOrganizations}
+            placeholder="Select tenant organization (optional)"
+            helperText="Choose which organization this user belongs to. Leave empty if not applicable."
+          />
           
           <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
             <div className="flex items-start space-x-2">

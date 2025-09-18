@@ -154,8 +154,10 @@ export const activitiesService = {
 
       // Calculate enhanced statistics
       const now = new Date();
-      const todayStart = new Date(now.setHours(0, 0, 0, 0));
-      const todayEnd = new Date(now.setHours(23, 59, 59, 999));
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayEnd = new Date(todayStart);
+      todayEnd?.setHours(23, 59, 59, 999);
+      
       const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -175,14 +177,17 @@ export const activitiesService = {
         },
         thisWeek: 0,
         thisMonth: 0,
+        typeBreakdown: {} // Add explicit type breakdown for debugging
       };
 
       data?.forEach(activity => {
         const activityDate = new Date(activity?.activity_date);
         
-        // Count by type
+        // Count by type with explicit tracking
         if (activity?.activity_type) {
           stats.byType[activity.activity_type] = (stats?.byType?.[activity?.activity_type] || 0) + 1;
+          // Also populate typeBreakdown for easier access
+          stats.typeBreakdown[activity.activity_type] = (stats?.typeBreakdown?.[activity?.activity_type] || 0) + 1;
         }
 
         // Count by outcome
@@ -190,7 +195,7 @@ export const activitiesService = {
           stats.byOutcome[activity.outcome] = (stats?.byOutcome?.[activity?.outcome] || 0) + 1;
         }
 
-        // Count by time category
+        // Count by time category with improved date comparison
         if (activityDate < todayStart) {
           stats.byTime.past++;
         } else if (activityDate >= todayStart && activityDate <= todayEnd) {
@@ -218,6 +223,14 @@ export const activitiesService = {
         if (activityDate >= monthStart) {
           stats.thisMonth++;
         }
+      });
+
+      // Debug logging to track email activities
+      console.log('Activity stats calculated:', {
+        total: stats?.total,
+        emailCount: stats?.typeBreakdown?.['Email'] || 0,
+        allTypes: Object.keys(stats?.typeBreakdown),
+        dateFilter: filters
       });
 
       return { success: true, data: stats };
@@ -266,13 +279,32 @@ export const activitiesService = {
         }
       }
 
-      // Set user_id to current user if not provided
+      // Get current user and their tenant_id
       const { data: { user } } = await supabase?.auth?.getUser();
-      if (!activityData?.user_id && user?.id) {
-        activityData.user_id = user?.id;
+      if (!user?.id) {
+        return { success: false, error: 'User must be authenticated' };
       }
 
-      const { data, error } = await supabase?.from('activities')?.insert(activityData)?.select(`
+      // Get user's tenant_id from user_profiles  
+      const { data: userProfile, error: profileError } = await supabase
+        ?.from('user_profiles')
+        ?.select('tenant_id')
+        ?.eq('id', user?.id)
+        ?.single();
+
+      if (profileError || !userProfile?.tenant_id) {
+        console.error('Failed to get user tenant:', profileError);
+        return { success: false, error: 'User tenant not found. Please contact support.' };
+      }
+
+      // Set user_id and tenant_id for the activity
+      const activityDataWithTenant = {
+        ...activityData,
+        user_id: user?.id,
+        tenant_id: userProfile?.tenant_id
+      };
+
+      const { data, error } = await supabase?.from('activities')?.insert(activityDataWithTenant)?.select(`
           *,
           user:user_profiles!user_id(id, full_name, email),
           account:accounts(id, name, company_type),
@@ -286,6 +318,11 @@ export const activitiesService = {
         // Handle specific constraint violations
         if (error?.code === '23503') {
           return { success: false, error: 'Invalid reference - check account, contact, or property selection' };
+        }
+
+        // Handle tenant validation errors
+        if (error?.message?.includes('does not belong to tenant')) {
+          return { success: false, error: 'Access denied - invalid tenant permissions' };
         }
 
         return { success: false, error: error?.message };
@@ -303,7 +340,31 @@ export const activitiesService = {
     if (!activityId) return { success: false, error: 'Activity ID is required' };
 
     try {
-      const { data, error } = await supabase?.from('activities')?.update(updates)?.eq('id', activityId)?.select(`
+      // Get current user and their tenant_id for validation
+      const { data: { user } } = await supabase?.auth?.getUser();
+      if (!user?.id) {
+        return { success: false, error: 'User must be authenticated' };
+      }
+
+      // Get user's tenant_id from user_profiles  
+      const { data: userProfile, error: profileError } = await supabase
+        ?.from('user_profiles')
+        ?.select('tenant_id')
+        ?.eq('id', user?.id)
+        ?.single();
+
+      if (profileError || !userProfile?.tenant_id) {
+        console.error('Failed to get user tenant:', profileError);
+        return { success: false, error: 'User tenant not found. Please contact support.' };
+      }
+
+      // Ensure tenant_id is set if it's being updated
+      const updatesWithTenant = {
+        ...updates,
+        tenant_id: userProfile?.tenant_id
+      };
+
+      const { data, error } = await supabase?.from('activities')?.update(updatesWithTenant)?.eq('id', activityId)?.select(`
           *,
           user:user_profiles!user_id(id, full_name, email),
           account:accounts(id, name, company_type),
@@ -313,6 +374,12 @@ export const activitiesService = {
 
       if (error) {
         console.error('Update activity error:', error);
+        
+        // Handle tenant validation errors
+        if (error?.message?.includes('does not belong to tenant')) {
+          return { success: false, error: 'Access denied - invalid tenant permissions' };
+        }
+
         return { success: false, error: error?.message };
       }
 
@@ -373,7 +440,8 @@ export const activitiesService = {
       let query = supabase?.from('activities')?.select(`
           *,
           user:user_profiles!user_id(id, full_name),
-          contact:contacts(id, first_name, last_name)
+          contact:contacts(id, first_name, last_name),
+          property:properties(id, name, address)
         `)?.eq('account_id', accountId)?.order('activity_date', { ascending: false });
 
       if (limit) {

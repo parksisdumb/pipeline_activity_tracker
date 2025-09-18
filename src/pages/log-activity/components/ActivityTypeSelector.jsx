@@ -5,49 +5,44 @@ import Icon from '../../../components/AppIcon';
 const ActivityTypeSelector = ({ value, onChange, error, disabled = false }) => {
   const activityTypes = [
     { 
-      value: 'pop_in', 
-      label: 'Pop-in Visit',
-      description: 'Unscheduled property visit'
+      value: 'Phone Call', 
+      label: 'Phone Call',
+      description: 'Telephone conversation with client'
     },
     { 
-      value: 'dm_conversation', 
-      label: 'Decision Maker Conversation',
-      description: 'Direct conversation with key decision maker'
+      value: 'Email', 
+      label: 'Email',
+      description: 'Email communication with client'
     },
     { 
-      value: 'assessment_booked', 
-      label: 'Assessment Booked',
-      description: 'Scheduled property assessment appointment'
+      value: 'Meeting', 
+      label: 'Meeting',
+      description: 'Scheduled meeting or appointment'
     },
     { 
-      value: 'proposal_sent', 
+      value: 'Site Visit', 
+      label: 'Site Visit',
+      description: 'Visit to property location'
+    },
+    { 
+      value: 'Proposal Sent', 
       label: 'Proposal Sent',
       description: 'Formal proposal submitted to client'
     },
     { 
-      value: 'win', 
-      label: 'Win',
-      description: 'Successfully closed deal'
+      value: 'Follow-up', 
+      label: 'Follow-up',
+      description: 'Follow-up communication or activity'
     },
     { 
-      value: 'loss', 
-      label: 'Loss',
-      description: 'Lost opportunity or deal'
+      value: 'Assessment', 
+      label: 'Assessment',
+      description: 'Property assessment or evaluation'
     },
     { 
-      value: 'call', 
-      label: 'Phone Call',
-      description: 'Telephone conversation'
-    },
-    { 
-      value: 'email', 
-      label: 'Email',
-      description: 'Email communication'
-    },
-    { 
-      value: 'meeting', 
-      label: 'Meeting',
-      description: 'Scheduled meeting or appointment'
+      value: 'Contract Signed', 
+      label: 'Contract Signed',
+      description: 'Contract executed and signed'
     }
   ];
 
@@ -66,6 +61,12 @@ const ActivityTypeSelector = ({ value, onChange, error, disabled = false }) => {
         disabled={disabled}
         required
         searchable
+        onSearchChange={() => {}}
+        id="activity-type-selector"
+        onOpenChange={() => {}}
+        label="Activity Type"
+        name="activityType"
+        description="Select the type of activity"
       />
     </div>
   );

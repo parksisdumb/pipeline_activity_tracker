@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
-import Icon from '../../../components/AppIcon';
+
+import { contactsService } from '../../../services/contactsService';
 
 const PropertyEditor = ({ property, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -20,7 +21,10 @@ const PropertyEditor = ({ property, onSave, onCancel }) => {
 
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+  const [contacts, setContacts] = useState([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
 
+  // Database enum values - exact matches
   const buildingTypes = [
     'Industrial',
     'Warehouse', 
@@ -41,6 +45,33 @@ const PropertyEditor = ({ property, onSave, onCancel }) => {
     'PVC',
     'BUR'
   ];
+
+  // Load contacts for the property's account
+  useEffect(() => {
+    if (property?.account_id) {
+      loadContactsForAccount(property?.account_id);
+    }
+  }, [property?.account_id]);
+
+  const loadContactsForAccount = async (accountId) => {
+    if (!accountId) return;
+    
+    setLoadingContacts(true);
+    try {
+      const result = await contactsService?.getContactsByAccount(accountId);
+      if (result?.success) {
+        setContacts(result?.data || []);
+      } else {
+        console.error('Failed to load contacts:', result?.error);
+        setContacts([]);
+      }
+    } catch (err) {
+      console.error('Load contacts error:', err);
+      setContacts([]);
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -102,6 +133,22 @@ const PropertyEditor = ({ property, onSave, onCancel }) => {
       setSaving(false);
     }
   };
+
+  // Transform data for Select components
+  const buildingTypeOptions = buildingTypes?.map(type => ({
+    value: type,
+    label: type
+  }));
+
+  const roofTypeOptions = roofTypes?.map(type => ({
+    value: type,
+    label: type
+  }));
+
+  const contactOptions = contacts?.map(contact => ({
+    value: contact?.id,
+    label: `${contact?.first_name} ${contact?.last_name}${contact?.title ? ` - ${contact?.title}` : ''}${contact?.is_primary_contact ? ' (Primary)' : ''}`
+  }));
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -174,24 +221,28 @@ const PropertyEditor = ({ property, onSave, onCancel }) => {
                 label="Building Type *"
                 value={formData?.building_type}
                 onChange={(value) => handleInputChange('building_type', value)}
+                options={buildingTypeOptions}
                 error={errors?.building_type}
-              >
-                <option value="">Select building type</option>
-                {buildingTypes?.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </Select>
+                placeholder="Select building type"
+                id="building_type"
+                name="building_type"
+                onSearchChange={() => {}}
+                onOpenChange={() => {}}
+                description=""
+              />
 
               <Select
                 label="Roof Type"
                 value={formData?.roof_type}
                 onChange={(value) => handleInputChange('roof_type', value)}
-              >
-                <option value="">Select roof type</option>
-                {roofTypes?.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </Select>
+                options={roofTypeOptions}
+                placeholder="Select roof type"
+                id="roof_type"
+                name="roof_type"
+                onSearchChange={() => {}}
+                onOpenChange={() => {}}
+                description=""
+              />
 
               <Input
                 label="Square Footage"
@@ -213,6 +264,70 @@ const PropertyEditor = ({ property, onSave, onCancel }) => {
             </div>
           </div>
 
+          {/* Contact Assignment */}
+          {property?.account && (
+            <div>
+              <h3 className="text-lg font-medium text-foreground mb-4">Contact Information</h3>
+              <div className="p-4 bg-muted rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Account
+                    </label>
+                    <p className="text-sm text-muted-foreground">
+                      {property?.account?.name} ({property?.account?.company_type})
+                    </p>
+                  </div>
+                  
+                  <Select
+                    label="Primary Contact (Optional)"
+                    value=""
+                    onChange={(value) => {
+                      // This is for display only - contacts are managed at account level
+                      console.log('Contact selected for reference:', value);
+                    }}
+                    options={contactOptions}
+                    placeholder={
+                      loadingContacts 
+                        ? "Loading contacts..." 
+                        : contacts?.length === 0 
+                          ? "No contacts available" : "View account contacts"
+                    }
+                    disabled={loadingContacts}
+                    clearable
+                    id="primary_contact"
+                    name="primary_contact"
+                    onSearchChange={() => {}}
+                    onOpenChange={() => {}}
+                    description=""
+                  />
+                </div>
+                
+                {contacts?.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Available contacts for this account:
+                    </p>
+                    <div className="space-y-1">
+                      {contacts?.slice(0, 3)?.map(contact => (
+                        <p key={contact?.id} className="text-xs text-muted-foreground">
+                          • {contact?.first_name} {contact?.last_name}
+                          {contact?.title && ` - ${contact?.title}`}
+                          {contact?.is_primary_contact && ' (Primary)'}
+                        </p>
+                      ))}
+                      {contacts?.length > 3 && (
+                        <p className="text-xs text-muted-foreground">
+                          + {contacts?.length - 3} more contacts
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">Notes</label>
@@ -231,18 +346,8 @@ const PropertyEditor = ({ property, onSave, onCancel }) => {
           <Button variant="outline" onClick={onCancel} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? (
-              <>
-                <Icon name="Loader2" size={16} className="animate-spin mr-2" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Icon name="Save" size={16} className="mr-2" />
-                Save Changes
-              </>
-            )}
+          <Button onClick={handleSave} disabled={saving} loading={saving}>
+            {saving ? 'Saving...' : 'Save Changes'}
           </Button>
         </div>
       </div>

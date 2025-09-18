@@ -3,6 +3,7 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { authService } from '../../../services/authService';
 
 const LoginForm = () => {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ const LoginForm = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [magicLinkSending, setMagicLinkSending] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e?.target;
@@ -40,22 +42,89 @@ const LoginForm = () => {
     try {
       const result = await signIn(formData?.email, formData?.password);
 
-      // Check if login was successful (no error means success)
       if (!result?.error) {
-        // Redirect to dashboard or previous page
-        navigate('/manager-dashboard');
+        // Check if user needs password setup or profile completion
+        if (result?.needsPasswordSetup || result?.profileIncomplete) {
+          navigate('/password-setup', { 
+            state: { 
+              email: formData?.email,
+              needsPasswordSetup: result?.needsPasswordSetup,
+              profileIncomplete: result?.profileIncomplete
+            }
+          });
+          return;
+        }
+
+        // Redirect based on user role
+        const userProfile = result?.data?.profile;
+        const userRole = userProfile?.role || 'rep';
+        
+        switch (userRole) {
+          case 'super_admin': navigate('/super-admin-dashboard');
+            break;
+          case 'admin': navigate('/admin-dashboard');
+            break;
+          case 'manager': navigate('/manager-dashboard');
+            break;
+          default:
+            navigate('/today');
+        }
       } else {
-        // Handle the error - ensure it's a string, not an Error object
-        const errorMessage = result?.error?.message || 'Failed to sign in';
-        setError(errorMessage);
+        // Enhanced error handling for specific authentication issues
+        const errorMessage = result?.error?.message || result?.error || 'Failed to sign in';
+        
+        if (errorMessage?.includes('Invalid login credentials')) {
+          setError('Invalid email or password. Please check your credentials and try again.');
+        } else if (errorMessage?.includes('Email not confirmed')) {
+          setError('Please check your email and click the confirmation link before signing in.');
+        } else if (errorMessage?.includes('Too many requests')) {
+          setError('Too many login attempts. Please wait a moment before trying again.');
+        } else {
+          setError(errorMessage);
+        }
       }
     } catch (error) {
-      // Handle any unexpected errors
       const errorMessage = error?.message || 'An unexpected error occurred';
       setError(errorMessage);
     }
 
     setLoading(false);
+  };
+
+  const handleForgotPassword = () => {
+    if (formData?.email) {
+      navigate('/password-reset-request', { 
+        state: { email: formData?.email }
+      });
+    } else {
+      navigate('/password-reset-request');
+    }
+  };
+
+  const handleSendMagicLink = async () => {
+    if (!formData?.email) {
+      setError('Please enter your email address first');
+      return;
+    }
+
+    setMagicLinkSending(true);
+    setError('');
+
+    try {
+      const result = await authService?.sendMagicLink(formData?.email);
+      
+      if (result?.success) {
+        setError(''); // Clear any previous errors
+        // Show success message
+        alert('Magic link sent! Please check your email and click the link to sign in.');
+      } else {
+        setError(result?.error || 'Failed to send magic link');
+      }
+    } catch (error) {
+      setError('An unexpected error occurred while sending magic link');
+    } finally {
+      setMagicLinkSending(false);
+    }
   };
 
   // Demo credential handler
@@ -124,10 +193,7 @@ const LoginForm = () => {
           <button
             type="button"
             className="text-sm text-blue-600 hover:text-blue-500"
-            onClick={() => {
-              // Handle forgot password
-              setError('Password reset functionality coming soon');
-            }}
+            onClick={handleForgotPassword}
           >
             Forgot password?
           </button>
@@ -140,7 +206,22 @@ const LoginForm = () => {
         >
           {loading ? 'Signing In...' : 'Sign In'}
         </Button>
+
+        {/* Enhanced authentication options */}
+        <div className="text-center">
+          <span className="text-sm text-gray-500">or</span>
+        </div>
+        
+        <button
+          type="button"
+          onClick={handleSendMagicLink}
+          disabled={loading || magicLinkSending}
+          className="w-full px-4 py-2 text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {magicLinkSending ? 'Sending Magic Link...' : 'Send Magic Link'}
+        </button>
       </form>
+      
       {/* Demo Credentials Section */}
       <div className="border-t pt-6">
         <h3 className="text-sm font-medium text-gray-700 mb-3">Demo Accounts</h3>
@@ -180,6 +261,7 @@ const LoginForm = () => {
           Click any demo account to auto-fill the login form with test credentials.
         </p>
       </div>
+      
       {/* Sign Up Link */}
       <div className="text-center">
         <p className="text-sm text-gray-600">

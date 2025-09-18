@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
+import { usersService } from '../../../services/usersService';
 
 const FilterToolbar = ({
   searchTerm,
@@ -17,6 +18,27 @@ const FilterToolbar = ({
   resultsCount,
   totalCount
 }) => {
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+
+  // Load users for assigned rep filter
+  useEffect(() => {
+    const loadUsers = async () => {
+      setUsersLoading(true);
+      const result = await usersService?.getActiveUsers();
+      
+      if (result?.success) {
+        setUsers(result?.data || []);
+      } else {
+        console.error('Failed to load users:', result?.error);
+        setUsers([]);
+      }
+      setUsersLoading(false);
+    };
+
+    loadUsers();
+  }, []);
+
   const companyTypeOptions = [
     { value: '', label: 'All Company Types' },
     { value: 'Property Management', label: 'Property Management' },
@@ -43,14 +65,17 @@ const FilterToolbar = ({
     { value: 'Lost', label: 'Lost' }
   ];
 
+  // Build assigned rep options from real user data
   const assignedRepOptions = [
     { value: '', label: 'All Representatives' },
-    { value: 'John Smith', label: 'John Smith' },
-    { value: 'Sarah Johnson', label: 'Sarah Johnson' },
-    { value: 'Mike Davis', label: 'Mike Davis' },
-    { value: 'Lisa Chen', label: 'Lisa Chen' },
-    { value: 'David Wilson', label: 'David Wilson' }
+    ...users?.map(user => ({
+      value: user?.id,
+      label: user?.full_name
+    }))
   ];
+
+  // Find the selected user's name for display
+  const selectedUserName = users?.find(user => user?.id === assignedRepFilter)?.full_name || assignedRepFilter;
 
   const hasActiveFilters = companyTypeFilter || stageFilter || assignedRepFilter || searchTerm;
 
@@ -92,6 +117,13 @@ const FilterToolbar = ({
           value={companyTypeFilter}
           onChange={onCompanyTypeChange}
           searchable
+          onSearchChange={() => {}}
+          error=""
+          id="company-type-filter"
+          onOpenChange={() => {}}
+          label=""
+          name="companyType"
+          description=""
         />
         
         <Select
@@ -99,14 +131,29 @@ const FilterToolbar = ({
           options={stageOptions}
           value={stageFilter}
           onChange={onStageChange}
+          onSearchChange={() => {}}
+          error=""
+          id="stage-filter"
+          onOpenChange={() => {}}
+          label=""
+          name="stage"
+          description=""
         />
         
         <Select
-          placeholder="Filter by representative"
+          placeholder={usersLoading ? "Loading representatives..." : "Filter by representative"}
           options={assignedRepOptions}
           value={assignedRepFilter}
           onChange={onAssignedRepChange}
           searchable
+          disabled={usersLoading}
+          onSearchChange={() => {}}
+          error=""
+          id="assigned-rep-filter"
+          onOpenChange={() => {}}
+          label=""
+          name="assignedRep"
+          description=""
         />
       </div>
       {/* Active Filters Display */}
@@ -152,7 +199,7 @@ const FilterToolbar = ({
           {assignedRepFilter && (
             <div className="inline-flex items-center bg-accent/10 text-accent px-2 py-1 rounded-md text-sm">
               <Icon name="User" size={12} className="mr-1" />
-              {assignedRepFilter}
+              {selectedUserName}
               <button
                 onClick={() => onAssignedRepChange('')}
                 className="ml-2 hover:text-accent-foreground"

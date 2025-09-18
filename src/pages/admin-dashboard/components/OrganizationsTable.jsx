@@ -7,30 +7,23 @@ import Modal from '../../../components/ui/Modal';
 
 const OrganizationsTable = ({ organizations = [], users = [], onUpdate, onRefresh }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStage, setFilterStage] = useState('all');
-  const [filterType, setFilterType] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterPlan, setFilterPlan] = useState('all');
   const [editingOrg, setEditingOrg] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const stages = [
-    'Prospect', 'Contacted', 'Qualified', 'Assessment Scheduled', 
-    'Assessed', 'Proposal Sent', 'In Negotiation', 'Won', 'Lost'
-  ];
-
-  const companyTypes = [
-    'Property Management', 'General Contractor', 'Developer', 
-    'REIT/Institutional Investor', 'Asset Manager', 'Building Owner'
-  ];
+  const statuses = ['active', 'inactive', 'suspended', 'trial', 'expired'];
+  const plans = ['free', 'basic', 'pro', 'enterprise', 'custom'];
 
   const filteredOrganizations = organizations?.filter(org => {
     const matchesSearch = !searchTerm || 
       org?.name?.toLowerCase()?.includes(searchTerm?.toLowerCase()) ||
-      org?.email?.toLowerCase()?.includes(searchTerm?.toLowerCase());
+      org?.contact_email?.toLowerCase()?.includes(searchTerm?.toLowerCase());
     
-    const matchesStage = filterStage === 'all' || org?.stage === filterStage;
-    const matchesType = filterType === 'all' || org?.company_type === filterType;
+    const matchesStatus = filterStatus === 'all' || org?.status === filterStatus;
+    const matchesPlan = filterPlan === 'all' || org?.subscription_plan === filterPlan;
     
-    return matchesSearch && matchesStage && matchesType;
+    return matchesSearch && matchesStatus && matchesPlan;
   });
 
   const handleAssignUser = async (orgId, userId) => {
@@ -64,12 +57,22 @@ const OrganizationsTable = ({ organizations = [], users = [], onUpdate, onRefres
     setIsModalOpen(true);
   };
 
-  const getStageColor = (stage) => {
-    switch (stage) {
-      case 'Won': return 'bg-success text-success-foreground';
-      case 'Lost': return 'bg-error text-error-foreground';
-      case 'Proposal Sent': case 'In Negotiation': return 'bg-warning text-warning-foreground';
-      case 'Qualified': case 'Assessment Scheduled': case 'Assessed': return 'bg-info text-info-foreground';
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active': return 'bg-success text-success-foreground';
+      case 'trial': return 'bg-info text-info-foreground';
+      case 'expired': case 'suspended': return 'bg-error text-error-foreground';
+      case 'inactive': return 'bg-warning text-warning-foreground';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const getPlanColor = (plan) => {
+    switch (plan) {
+      case 'enterprise': case 'custom': return 'bg-accent text-accent-foreground';
+      case 'pro': return 'bg-success text-success-foreground';
+      case 'basic': return 'bg-info text-info-foreground';
+      case 'free': return 'bg-muted text-muted-foreground';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -78,7 +81,7 @@ const OrganizationsTable = ({ organizations = [], users = [], onUpdate, onRefres
     <div className="space-y-6">
       {/* Header and Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-xl font-semibold text-foreground">Organizations Management</h2>
+        <h2 className="text-xl font-semibold text-foreground">Tenant Organizations</h2>
         <div className="flex flex-wrap gap-3">
           <Input
             placeholder="Search organizations..."
@@ -88,20 +91,20 @@ const OrganizationsTable = ({ organizations = [], users = [], onUpdate, onRefres
             iconName="Search"
           />
           <Select
-            value={filterStage}
-            onChange={(value) => setFilterStage(value)}
+            value={filterStatus}
+            onChange={(value) => setFilterStatus(value)}
             options={[
-              { value: 'all', label: 'All Stages' },
-              ...stages?.map(stage => ({ value: stage, label: stage }))
+              { value: 'all', label: 'All Status' },
+              ...statuses?.map(status => ({ value: status, label: status?.charAt(0)?.toUpperCase() + status?.slice(1) }))
             ]}
             className="w-48"
           />
           <Select
-            value={filterType}
-            onChange={(value) => setFilterType(value)}
+            value={filterPlan}
+            onChange={(value) => setFilterPlan(value)}
             options={[
-              { value: 'all', label: 'All Types' },
-              ...companyTypes?.map(type => ({ value: type, label: type }))
+              { value: 'all', label: 'All Plans' },
+              ...plans?.map(plan => ({ value: plan, label: plan?.charAt(0)?.toUpperCase() + plan?.slice(1) }))
             ]}
             className="w-48"
           />
@@ -115,9 +118,9 @@ const OrganizationsTable = ({ organizations = [], users = [], onUpdate, onRefres
             <thead className="bg-muted/50 border-b border-border">
               <tr>
                 <th className="text-left p-4 font-medium text-muted-foreground">Organization</th>
-                <th className="text-left p-4 font-medium text-muted-foreground">Type</th>
-                <th className="text-left p-4 font-medium text-muted-foreground">Stage</th>
-                <th className="text-left p-4 font-medium text-muted-foreground">Assigned Rep</th>
+                <th className="text-left p-4 font-medium text-muted-foreground">Plan</th>
+                <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
+                <th className="text-left p-4 font-medium text-muted-foreground">Users</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Contact Info</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Created</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Actions</th>
@@ -125,7 +128,7 @@ const OrganizationsTable = ({ organizations = [], users = [], onUpdate, onRefres
             </thead>
             <tbody>
               {filteredOrganizations?.map(org => {
-                const assignedRep = users?.find(user => user?.id === org?.assigned_rep_id);
+                const owner = users?.find(user => user?.id === org?.owner_id);
                 return (
                   <tr key={org?.id} className="border-b border-border hover:bg-muted/20">
                     <td className="p-4">
@@ -135,55 +138,41 @@ const OrganizationsTable = ({ organizations = [], users = [], onUpdate, onRefres
                         </div>
                         <div>
                           <div className="font-medium text-foreground">{org?.name}</div>
-                          <div className="text-sm text-muted-foreground">{org?.city}, {org?.state}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {org?.city ? `${org?.city}, ${org?.state}` : org?.slug}
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td className="p-4">
-                      <span className="text-sm text-foreground">{org?.company_type}</span>
-                    </td>
-                    <td className="p-4">
-                      <span className={`px-2 py-1 text-xs rounded-full ${getStageColor(org?.stage)}`}>
-                        {org?.stage}
+                      <span className={`px-2 py-1 text-xs rounded-full ${getPlanColor(org?.subscription_plan)}`}>
+                        {org?.subscription_plan?.charAt(0)?.toUpperCase() + org?.subscription_plan?.slice(1)}
                       </span>
                     </td>
                     <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        {assignedRep ? (
-                          <div className="flex items-center space-x-2">
-                            <div className="w-8 h-8 bg-success/10 rounded-full flex items-center justify-center">
-                              <Icon name="User" size={14} className="text-success" />
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium text-foreground">{assignedRep?.full_name}</div>
-                              <div className="text-xs text-muted-foreground">{assignedRep?.role}</div>
-                            </div>
+                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(org?.status)}`}>
+                        {org?.status?.charAt(0)?.toUpperCase() + org?.status?.slice(1)}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="text-sm">
+                        <div className="text-foreground">
+                          {org?.max_users} max users
+                        </div>
+                        {owner && (
+                          <div className="text-muted-foreground text-xs">
+                            Owner: {owner?.full_name}
                           </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Unassigned</span>
                         )}
-                        <Select
-                          value={org?.assigned_rep_id || ''}
-                          onChange={(userId) => handleAssignUser(org?.id, userId)}
-                          options={[
-                            { value: '', label: 'Unassigned' },
-                            ...users?.map(user => ({
-                              value: user?.id,
-                              label: `${user?.full_name} (${user?.role})`
-                            }))
-                          ]}
-                          className="w-32"
-                          size="sm"
-                        />
                       </div>
                     </td>
                     <td className="p-4">
                       <div className="text-sm">
-                        {org?.email && (
-                          <div className="text-foreground">{org?.email}</div>
+                        {org?.contact_email && (
+                          <div className="text-foreground">{org?.contact_email}</div>
                         )}
-                        {org?.phone && (
-                          <div className="text-muted-foreground">{org?.phone}</div>
+                        {org?.contact_phone && (
+                          <div className="text-muted-foreground">{org?.contact_phone}</div>
                         )}
                       </div>
                     </td>
@@ -204,7 +193,7 @@ const OrganizationsTable = ({ organizations = [], users = [], onUpdate, onRefres
                           variant="ghost"
                           size="sm"
                           iconName="ExternalLink"
-                          onClick={() => window.open(`/account-details/${org?.id}`, '_blank')}
+                          onClick={() => window.open(`/tenant/${org?.slug}`, '_blank')}
                         />
                       </div>
                     </td>
@@ -231,7 +220,7 @@ const OrganizationsTable = ({ organizations = [], users = [], onUpdate, onRefres
           setIsModalOpen(false);
           setEditingOrg(null);
         }}
-        title="Edit Organization"
+        title="Edit Tenant Organization"
       >
         {editingOrg && (
           <div className="space-y-4">
@@ -242,33 +231,54 @@ const OrganizationsTable = ({ organizations = [], users = [], onUpdate, onRefres
               placeholder="Enter organization name"
             />
             
-            <Select
-              label="Company Type"
-              value={editingOrg?.company_type || ''}
-              onChange={(value) => setEditingOrg({ ...editingOrg, company_type: value })}
-              options={companyTypes?.map(type => ({ value: type, label: type }))}
+            <Input
+              label="Slug"
+              value={editingOrg?.slug || ''}
+              onChange={(e) => setEditingOrg({ ...editingOrg, slug: e?.target?.value })}
+              placeholder="Enter organization slug"
             />
             
             <Select
-              label="Stage"
-              value={editingOrg?.stage || ''}
-              onChange={(value) => setEditingOrg({ ...editingOrg, stage: value })}
-              options={stages?.map(stage => ({ value: stage, label: stage }))}
+              label="Subscription Plan"
+              value={editingOrg?.subscription_plan || ''}
+              onChange={(value) => setEditingOrg({ ...editingOrg, subscription_plan: value })}
+              options={plans?.map(plan => ({ 
+                value: plan, 
+                label: plan?.charAt(0)?.toUpperCase() + plan?.slice(1) 
+              }))}
+            />
+            
+            <Select
+              label="Status"
+              value={editingOrg?.status || ''}
+              onChange={(value) => setEditingOrg({ ...editingOrg, status: value })}
+              options={statuses?.map(status => ({ 
+                value: status, 
+                label: status?.charAt(0)?.toUpperCase() + status?.slice(1) 
+              }))}
             />
             
             <Input
-              label="Email"
+              label="Contact Email"
               type="email"
-              value={editingOrg?.email || ''}
-              onChange={(e) => setEditingOrg({ ...editingOrg, email: e?.target?.value })}
-              placeholder="Enter email address"
+              value={editingOrg?.contact_email || ''}
+              onChange={(e) => setEditingOrg({ ...editingOrg, contact_email: e?.target?.value })}
+              placeholder="Enter contact email"
             />
             
             <Input
-              label="Phone"
-              value={editingOrg?.phone || ''}
-              onChange={(e) => setEditingOrg({ ...editingOrg, phone: e?.target?.value })}
-              placeholder="Enter phone number"
+              label="Contact Phone"
+              value={editingOrg?.contact_phone || ''}
+              onChange={(e) => setEditingOrg({ ...editingOrg, contact_phone: e?.target?.value })}
+              placeholder="Enter contact phone"
+            />
+
+            <Input
+              label="Max Users"
+              type="number"
+              value={editingOrg?.max_users || ''}
+              onChange={(e) => setEditingOrg({ ...editingOrg, max_users: parseInt(e?.target?.value) })}
+              placeholder="Maximum users allowed"
             />
             
             <div className="flex justify-end space-x-3 pt-4">
@@ -284,10 +294,12 @@ const OrganizationsTable = ({ organizations = [], users = [], onUpdate, onRefres
               <Button
                 onClick={() => handleUpdateOrg({
                   name: editingOrg?.name,
-                  company_type: editingOrg?.company_type,
-                  stage: editingOrg?.stage,
-                  email: editingOrg?.email,
-                  phone: editingOrg?.phone
+                  slug: editingOrg?.slug,
+                  subscription_plan: editingOrg?.subscription_plan,
+                  status: editingOrg?.status,
+                  contact_email: editingOrg?.contact_email,
+                  contact_phone: editingOrg?.contact_phone,
+                  max_users: editingOrg?.max_users
                 })}
               >
                 Update Organization

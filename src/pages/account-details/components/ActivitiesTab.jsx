@@ -4,7 +4,7 @@ import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Select from '../../../components/ui/Select';
 
-const ActivitiesTab = ({ accountId, activities, onLogActivity }) => {
+const ActivitiesTab = ({ accountId, activities, loading, onLogActivity, onRefreshActivities }) => {
   const navigate = useNavigate();
   const [filterType, setFilterType] = useState('');
   const [filterDateRange, setFilterDateRange] = useState('');
@@ -122,13 +122,49 @@ const ActivitiesTab = ({ accountId, activities, onLogActivity }) => {
     return matchesType && matchesDateRange;
   });
 
+  // Loading state for activities
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <h3 className="text-lg font-semibold text-foreground">
+            Activity History
+          </h3>
+          <Button 
+            onClick={onLogActivity}
+            iconName="Plus"
+            iconPosition="left"
+            size="sm"
+          >
+            Log Activity
+          </Button>
+        </div>
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading activities...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header with Log Activity Button */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h3 className="text-lg font-semibold text-foreground">
-          Activity History ({activities?.length})
-        </h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-lg font-semibold text-foreground">
+            Activity History ({activities?.length})
+          </h3>
+          {onRefreshActivities && (
+            <button
+              onClick={onRefreshActivities}
+              className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+              title="Refresh activities"
+            >
+              <Icon name="RefreshCw" size={16} />
+            </button>
+          )}
+        </div>
         <Button 
           onClick={onLogActivity}
           iconName="Plus"
@@ -141,16 +177,30 @@ const ActivitiesTab = ({ accountId, activities, onLogActivity }) => {
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Select
+          id="activity-type-filter"
+          name="activityType"
+          label="Activity Type"
           placeholder="Filter by activity type"
           options={activityTypeOptions}
           value={filterType}
           onChange={setFilterType}
+          onSearchChange={() => {}}
+          onOpenChange={() => {}}
+          error=""
+          description=""
         />
         <Select
+          id="date-range-filter"
+          name="dateRange"
+          label="Date Range"
           placeholder="Filter by date range"
           options={dateRangeOptions}
           value={filterDateRange}
           onChange={setFilterDateRange}
+          onSearchChange={() => {}}
+          onOpenChange={() => {}}
+          error=""
+          description=""
         />
       </div>
       {/* Activities Timeline */}

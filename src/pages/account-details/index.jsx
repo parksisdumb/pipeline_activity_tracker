@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Header from '../../components/ui/Header';
 import SidebarNavigation from '../../components/ui/SidebarNavigation';
 import QuickActionButton from '../../components/ui/QuickActionButton';
+import EditAccountModal from '../../components/ui/EditAccountModal';
 import AccountHeader from './components/AccountHeader';
 import TabNavigation from './components/TabNavigation';
 import PropertiesTab from './components/PropertiesTab';
@@ -11,6 +12,8 @@ import ActivitiesTab from './components/ActivitiesTab';
 import { useAuth } from '../../contexts/AuthContext';
 import { accountsService } from '../../services/accountsService';
 import { propertiesService } from '../../services/propertiesService';
+import { contactsService } from '../../services/contactsService';
+import { activitiesService } from '../../services/activitiesService';
 
 const AccountDetails = () => {
   const navigate = useNavigate();
@@ -23,9 +26,14 @@ const AccountDetails = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [account, setAccount] = useState(null);
   const [properties, setProperties] = useState([]);
+  const [contacts, setContacts] = useState([]);
+  const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [propertiesLoading, setPropertiesLoading] = useState(false);
+  const [propertiesLoading, setPropertiesLoading] = useState(true);
+  const [contactsLoading, setContactsLoading] = useState(true);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Mock contacts data - replace with actual service call
   const mockContacts = [
@@ -51,30 +59,6 @@ const AccountDetails = () => {
     }
   ];
 
-  // Mock activities data - replace with actual service call
-  const mockActivities = [
-    {
-      id: '1',
-      type: 'proposal_sent',
-      timestamp: '2024-09-03T14:30:00Z',
-      property: 'Northside Warehouse',
-      contact: 'Mike Chen',
-      outcome: 'Positive Response',
-      notes: 'Sent comprehensive proposal for roof replacement. Mike mentioned they have budget approval and are looking to start work in Q4.',
-      next_action: 'Follow up in 3 days to discuss timeline and answer any questions'
-    },
-    {
-      id: '2',
-      type: 'assessment_booked',
-      timestamp: '2024-09-01T10:15:00Z',
-      property: 'Downtown Office Tower',
-      contact: 'Lisa Rodriguez',
-      outcome: 'Scheduled',
-      notes: 'Booked assessment for September 10th at 9 AM. Lisa will meet us on-site to provide building access.',
-      next_action: 'Confirm assessment 24 hours before scheduled time'
-    }
-  ];
-
   useEffect(() => {
     if (!accountId) {
       navigate('/accounts-list');
@@ -83,6 +67,8 @@ const AccountDetails = () => {
     
     loadAccount();
     loadProperties();
+    loadContacts();
+    loadActivities();
   }, [accountId, navigate]);
 
   useEffect(() => {
@@ -92,19 +78,6 @@ const AccountDetails = () => {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
-
-  // Listen for focus events to refresh data when user returns from adding property
-  useEffect(() => {
-    const handleFocus = () => {
-      // Only refresh if user is on properties tab and account is loaded
-      if (activeTab === 'properties' && account && !propertiesLoading) {
-        loadProperties();
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [activeTab, account, propertiesLoading]);
 
   const loadAccount = async () => {
     if (!accountId || !user) return;
@@ -141,10 +114,31 @@ const AccountDetails = () => {
       const result = await propertiesService?.getPropertiesByAccount(accountId);
       
       if (result?.success) {
-        setProperties(result?.data || []);
+        // Map the database fields to match the component expectations
+        const mappedProperties = result?.data?.map(property => ({
+          id: property?.id,
+          name: property?.name,
+          address: property?.address,
+          building_type: property?.building_type,
+          buildingType: property?.building_type, // Keep both for compatibility
+          roof_type: property?.roof_type,
+          roofType: property?.roof_type, // Keep both for compatibility
+          stage: property?.stage,
+          square_footage: property?.square_footage,
+          squareFootage: property?.square_footage, // Keep both for compatibility
+          year_built: property?.year_built,
+          city: property?.city,
+          state: property?.state,
+          zip_code: property?.zip_code,
+          created_at: property?.created_at,
+          updated_at: property?.updated_at,
+          last_assessment: property?.last_assessment,
+          notes: property?.notes
+        }));
+        
+        setProperties(mappedProperties || []);
       } else {
-        console.error('Error loading properties:', result?.error);
-        // Don't show error for properties, just use empty array
+        console.error('Failed to load properties:', result?.error);
         setProperties([]);
       }
     } catch (err) {
@@ -153,6 +147,127 @@ const AccountDetails = () => {
     } finally {
       setPropertiesLoading(false);
     }
+  };
+
+  const loadContacts = async () => {
+    if (!accountId || !user) return;
+
+    setContactsLoading(true);
+
+    try {
+      const result = await contactsService?.getContactsByAccount(accountId);
+      
+      if (result?.success) {
+        // Map the database fields to match the component expectations
+        const mappedContacts = result?.data?.map(contact => ({
+          id: contact?.id,
+          name: `${contact?.first_name} ${contact?.last_name}`,
+          first_name: contact?.first_name,
+          last_name: contact?.last_name,
+          title: contact?.title,
+          role: contact?.title, // Map title to role for component compatibility
+          email: contact?.email,
+          phone: contact?.phone,
+          mobile_phone: contact?.mobile_phone,
+          stage: contact?.stage,
+          is_primary_contact: contact?.is_primary_contact,
+          property_id: contact?.property_id,
+          created_at: contact?.created_at,
+          updated_at: contact?.updated_at,
+          notes: contact?.notes,
+          // Add any computed fields if needed
+          lastContact: contact?.updated_at ? getRelativeTime(contact?.updated_at) : null
+        }));
+        
+        setContacts(mappedContacts || []);
+        console.log('Loaded contacts for account:', accountId, 'count:', mappedContacts?.length);
+      } else {
+        console.error('Failed to load contacts:', result?.error);
+        setContacts([]);
+        // Show error message to user if it's not just empty results
+        if (result?.error && !result?.error?.includes('not found')) {
+          setError(`Failed to load contacts: ${result?.error}`);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading contacts:', err);
+      setContacts([]);
+      setError('Failed to load contacts');
+    } finally {
+      setContactsLoading(false);
+    }
+  };
+
+  const loadActivities = async () => {
+    if (!accountId || !user) return;
+
+    setActivitiesLoading(true);
+
+    try {
+      const result = await activitiesService?.getActivitiesByAccount(accountId);
+      
+      if (result?.success) {
+        // Map database fields to match the component expectations
+        const mappedActivities = result?.data?.map(activity => ({
+          id: activity?.id,
+          type: mapActivityTypeToUIType(activity?.activity_type),
+          timestamp: activity?.activity_date,
+          property: activity?.property?.name,
+          contact: activity?.contact ? 
+            `${activity?.contact?.first_name} ${activity?.contact?.last_name}` : null,
+          outcome: activity?.outcome,
+          notes: activity?.notes,
+          nextAction: activity?.description,
+          subject: activity?.subject,
+          // Keep database fields for reference
+          activity_type: activity?.activity_type,
+          activity_date: activity?.activity_date,
+          follow_up_date: activity?.follow_up_date,
+          duration_minutes: activity?.duration_minutes,
+          user: activity?.user,
+          created_at: activity?.created_at
+        }));
+        
+        setActivities(mappedActivities || []);
+      } else {
+        console.error('Failed to load activities:', result?.error);
+        setActivities([]);
+      }
+    } catch (err) {
+      console.error('Error loading activities:', err);
+      setActivities([]);
+    } finally {
+      setActivitiesLoading(false);
+    }
+  };
+
+  // Map database activity types to UI types expected by component
+  const mapActivityTypeToUIType = (dbActivityType) => {
+    const activityTypeMap = {
+      'Phone Call': 'call',
+      'Email': 'email', 
+      'Meeting': 'meeting',
+      'Site Visit': 'pop_in',
+      'Proposal Sent': 'proposal_sent',
+      'Follow-up': 'dm_conversation',
+      'Assessment': 'assessment_booked',
+      'Contract Signed': 'win'
+    };
+    return activityTypeMap?.[dbActivityType] || dbActivityType?.toLowerCase()?.replace(/\s+/g, '_');
+  };
+
+  // Helper function to get relative time (e.g., "2 days ago")
+  const getRelativeTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMs = now - date;
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+    
+    if (diffInDays === 0) return 'Today';
+    if (diffInDays === 1) return 'Yesterday';
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+    if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} week${Math.floor(diffInDays / 7) > 1 ? 's' : ''} ago`;
+    return `${Math.floor(diffInDays / 30)} month${Math.floor(diffInDays / 30) > 1 ? 's' : ''} ago`;
   };
 
   const handleTabChange = (tabId) => {
@@ -164,8 +279,14 @@ const AccountDetails = () => {
   };
 
   const handleEditAccount = () => {
-    console.log('Edit account:', accountId);
-    // Navigate to edit account form
+    setIsEditModalOpen(true);
+  };
+
+  const handleAccountUpdated = (updatedAccount) => {
+    // Update the account state with the new data
+    setAccount(updatedAccount);
+    // Optionally refresh the account data from server
+    loadAccount();
   };
 
   const handleLogActivity = () => {
@@ -188,11 +309,6 @@ const AccountDetails = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  // Handle property refresh after adding/editing
-  const handlePropertiesRefresh = () => {
-    loadProperties();
-  };
-
   const renderTabContent = () => {
     switch (activeTab) {
       case 'properties':
@@ -202,23 +318,27 @@ const AccountDetails = () => {
             properties={properties}
             loading={propertiesLoading}
             onAddProperty={handleAddProperty}
-            onRefresh={handlePropertiesRefresh}
+            onRefreshProperties={loadProperties}
           />
         );
       case 'contacts':
         return (
           <ContactsTab
             accountId={accountId}
-            contacts={mockContacts}
+            contacts={contacts}
+            loading={contactsLoading}
             onAddContact={handleAddContact}
+            onRefreshContacts={loadContacts}
           />
         );
       case 'activities':
         return (
           <ActivitiesTab
             accountId={accountId}
-            activities={mockActivities}
+            activities={activities}
+            loading={activitiesLoading}
             onLogActivity={handleLogActivity}
+            onRefreshActivities={loadActivities}
           />
         );
       default:
@@ -323,8 +443,8 @@ const AccountDetails = () => {
           activeTab={activeTab}
           onTabChange={handleTabChange}
           propertiesCount={properties?.length}
-          contactsCount={mockContacts?.length}
-          activitiesCount={mockActivities?.length}
+          contactsCount={contacts?.length}
+          activitiesCount={activities?.length}
         />
 
         {/* Tab Content */}
@@ -335,6 +455,14 @@ const AccountDetails = () => {
       
       {/* Mobile Quick Action Button */}
       <QuickActionButton onClick={handleLogActivity} />
+
+      {/* Edit Account Modal */}
+      <EditAccountModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onAccountUpdated={handleAccountUpdated}
+        account={account}
+      />
     </div>
   );
 };

@@ -77,6 +77,7 @@ const Select = ({
           : [...newValue, option?.value];
       onChange?.(updatedValue);
     } else {
+      // Pass the value directly to the onChange handler, not an event object
       onChange?.(option?.value);
       setIsOpen(false);
       onOpenChange?.(false);
@@ -162,7 +163,7 @@ const Select = ({
         <select
           name={name}
           value={value || ''}
-          onChange={() => { }} // Controlled by our custom logic
+          onChange={(e) => onChange?.(e?.target?.value)} // Fix: Pass value to onChange, not event
           className="sr-only"
           tabIndex={-1}
           multiple={multiple}

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Header from '../../components/ui/Header';
+import SidebarNavigation from '../../components/ui/SidebarNavigation';
 import ContactsHeader from './components/ContactsHeader';
 import ContactsStats from './components/ContactsStats';
 import ContactsFilters from './components/ContactsFilters';
@@ -13,6 +15,9 @@ const ContactsList = () => {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAddContactModalOpen, setIsAddContactModalOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userRole] = useState('rep'); // This would come from auth context
   const [filters, setFilters] = useState({
     search: '',
     role: '',
@@ -29,6 +34,8 @@ const ContactsList = () => {
   // Load contacts from database on component mount
   useEffect(() => {
     loadContacts();
+    // Set page title
+    document.title = 'Contacts - Pipeline Activity Tracker';
   }, []);
 
   const loadContacts = async () => {
@@ -112,6 +119,14 @@ const ContactsList = () => {
     return { total, engaged, dmConfirmed, dormant };
   }, [contacts]);
 
+  const handleToggleSidebar = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
+
+  const handleToggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen);
+  };
+
   const handleSort = (field) => {
     setSortConfig(prev => ({
       field,
@@ -155,55 +170,128 @@ const ContactsList = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-6 max-w-7xl">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-muted-foreground">Loading contacts...</div>
-          </div>
+        {/* Header - Show on all screen sizes for consistent profile access */}
+        <Header 
+          userRole={userRole}
+          onMenuToggle={handleToggleMobileMenu}
+          isMenuOpen={mobileMenuOpen}
+        />
+
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block">
+          <SidebarNavigation
+            userRole={userRole}
+            isCollapsed={sidebarCollapsed}
+            onToggleCollapse={handleToggleSidebar}
+          />
         </div>
+
+        {/* Mobile Sidebar Overlay */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <div className="fixed inset-0 bg-black/50" onClick={handleToggleMobileMenu} />
+            <SidebarNavigation
+              userRole={userRole}
+              isCollapsed={false}
+              onToggleCollapse={handleToggleMobileMenu}
+              className="relative z-10"
+            />
+          </div>
+        )}
+
+        {/* Main Content */}
+        <main 
+          className={`transition-all duration-200 ease-out pt-16 ${
+            sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-60'
+          }`}
+        >
+          <div className="container mx-auto px-4 py-6 max-w-7xl">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-muted-foreground">Loading contacts...</div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
-        <ContactsHeader 
-          totalCount={contacts?.length}
-          selectedCount={selectedContacts?.length}
-          onBulkAction={handleBulkAction}
-          onAddContact={handleAddContact}
+      {/* Header - Show on all screen sizes for consistent profile access */}
+      <Header 
+        userRole={userRole}
+        onMenuToggle={handleToggleMobileMenu}
+        isMenuOpen={mobileMenuOpen}
+      />
+
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:block">
+        <SidebarNavigation
+          userRole={userRole}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={handleToggleSidebar}
         />
-        
-        <ContactsStats stats={stats} />
-        
-        <ContactsFilters
-          filters={filters}
-          onFiltersChange={handleFiltersChange}
-          totalCount={contacts?.length}
-          filteredCount={filteredContacts?.length}
-          onExport={handleExport}
-          onBulkAction={handleBulkAction}
-        />
-        
-        <ContactsTable
-          contacts={filteredContacts}
-          onSort={handleSort}
-          sortConfig={sortConfig}
-          onContactAction={handleContactAction}
-        />
-        
-        {contacts?.length === 0 && !loading && (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground mb-4">No contacts found</p>
-            <button
-              onClick={handleAddContact}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-            >
-              Add your first contact
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* Mobile Sidebar Overlay */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="fixed inset-0 bg-black/50" onClick={handleToggleMobileMenu} />
+          <SidebarNavigation
+            userRole={userRole}
+            isCollapsed={false}
+            onToggleCollapse={handleToggleMobileMenu}
+            className="relative z-10"
+          />
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main 
+        className={`transition-all duration-200 ease-out pt-16 ${
+          sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-60'
+        }`}
+      >
+        <div className="container mx-auto px-4 py-6 max-w-7xl">
+          <ContactsHeader 
+            totalCount={contacts?.length}
+            selectedCount={selectedContacts?.length}
+            onBulkAction={handleBulkAction}
+            onAddContact={handleAddContact}
+          />
+          
+          <ContactsStats stats={stats} />
+          
+          <ContactsFilters
+            filters={filters}
+            onFiltersChange={handleFiltersChange}
+            totalCount={contacts?.length}
+            filteredCount={filteredContacts?.length}
+            onExport={handleExport}
+            onBulkAction={handleBulkAction}
+          />
+          
+          <ContactsTable
+            contacts={filteredContacts}
+            onSort={handleSort}
+            sortConfig={sortConfig}
+            onContactAction={handleContactAction}
+          />
+          
+          {contacts?.length === 0 && !loading && (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground mb-4">No contacts found</p>
+              <button
+                onClick={handleAddContact}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+              >
+                Add your first contact
+              </button>
+            </div>
+          )}
+        </div>
+      </main>
+      
       <QuickActionButton onClick={handleAddContact} />
       
       <AddContactModal

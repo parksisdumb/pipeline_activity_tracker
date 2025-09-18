@@ -68,6 +68,25 @@ export const propertiesService = {
   // Get a single property by ID
   async getProperty(propertyId) {
     if (!propertyId) return { success: false, error: 'Property ID is required' };
+    
+    // Add validation to check if propertyId is the literal string ":id"
+    if (propertyId === ':id' || propertyId?.includes(':id')) {
+      console.warn('Invalid property ID detected: route parameter not replaced');
+      return { 
+        success: false, 
+        error: 'Invalid property ID. Please navigate from the properties list.' 
+      };
+    }
+
+    // Add UUID format validation
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex?.test(propertyId)) {
+      console.warn('Invalid UUID format:', propertyId);
+      return { 
+        success: false, 
+        error: 'Invalid property ID format. Please check the URL and try again.' 
+      };
+    }
 
     try {
       const { data, error } = await supabase?.from('properties')?.select(`
@@ -322,34 +341,6 @@ export const propertiesService = {
     } catch (error) {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to load assigned accounts' };
-    }
-  },
-
-  // NEW: Get all available accounts for property creation (shared access)
-  async getAllAvailableAccounts() {
-    try {
-      const { data, error } = await supabase
-        ?.from('accounts')
-        ?.select('id, name, company_type, stage')
-        ?.eq('is_active', true)
-        ?.order('name');
-
-      if (error) {
-        console.error('Get all accounts error:', error);
-        // Handle specific permission errors
-        if (error?.code === '42501' || error?.message?.includes('permission')) {
-          return { 
-            success: false, 
-            error: 'Access denied. Please contact your administrator for account access.' 
-          };
-        }
-        return { success: false, error: error?.message };
-      }
-
-      return { success: true, data: data || [] };
-    } catch (error) {
-      console.error('Service error:', error);
-      return { success: false, error: 'Failed to load available accounts' };
     }
   }
 };

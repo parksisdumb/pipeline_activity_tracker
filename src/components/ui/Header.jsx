@@ -110,7 +110,7 @@ const Header = ({ userRole = 'rep', onMenuToggle, isMenuOpen = false }) => {
               </Button>
               
               {userMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-popover border border-border rounded-md elevation-2 py-1 z-300 dropdown-visible">
+                <div className="absolute right-0 top-full mt-1 w-48 bg-popover border border-border rounded-md elevation-2 py-1">
                   {overflowItems?.map((item) => (
                     <Link
                       key={item?.path}
@@ -147,7 +147,6 @@ const Header = ({ userRole = 'rep', onMenuToggle, isMenuOpen = false }) => {
             <UserProfileDropdown 
               user={displayUser}
               isCollapsed={false}
-              className="header-dropdown"
             />
           </div>
           
@@ -155,7 +154,6 @@ const Header = ({ userRole = 'rep', onMenuToggle, isMenuOpen = false }) => {
             <UserProfileDropdown 
               user={displayUser}
               isCollapsed={true}
-              className="header-dropdown"
             />
           </div>
         </div>

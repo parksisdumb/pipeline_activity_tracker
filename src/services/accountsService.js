@@ -6,7 +6,7 @@ export const accountsService = {
     try {
       let query = supabase?.from('accounts')?.select(`
           *,
-          assigned_rep:user_profiles!assigned_rep_id(id, full_name, email),
+          assigned_rep:user_profiles(id, full_name, email),
           properties(id, name, stage),
           contacts(id, first_name, last_name, is_primary_contact)
         `);
@@ -41,15 +41,6 @@ export const accountsService = {
 
       if (error) {
         console.error('Accounts query error:', error);
-        
-        // Enhanced error handling for RLS permission issues
-        if (error?.code === '42501' || error?.message?.includes('permission')) {
-          return { 
-            success: false, 
-            error: 'Access denied. Please contact your administrator for account access.' 
-          };
-        }
-        
         return { success: false, error: error?.message };
       }
 
@@ -81,7 +72,7 @@ export const accountsService = {
     try {
       const { data, error } = await supabase?.from('accounts')?.select(`
           *,
-          assigned_rep:user_profiles!assigned_rep_id(id, full_name, email),
+          assigned_rep:user_profiles(id, full_name, email),
           properties(*),
           contacts(*),
           activities(*)
@@ -102,7 +93,7 @@ export const accountsService = {
     }
   },
 
-  // Create a new account
+  // Create a new account - Fixed to handle tenant issues
   async createAccount(accountData) {
     try {
       // Ensure required fields are present
@@ -113,15 +104,20 @@ export const accountsService = {
         }
       }
 
-      // Set assigned_rep_id to current user if not provided
-      const { data: { user } } = await supabase?.auth?.getUser();
-      if (!accountData?.assigned_rep_id && user?.id) {
+      // Get current user to handle tenant assignment
+      const { data: { user }, error: userError } = await supabase?.auth?.getUser();
+      if (userError || !user) {
+        return { success: false, error: 'Authentication required to create account' };
+      }
+
+      // If no assigned rep is provided, assign to current user
+      if (!accountData?.assigned_rep_id) {
         accountData.assigned_rep_id = user?.id;
       }
 
       const { data, error } = await supabase?.from('accounts')?.insert(accountData)?.select(`
           *,
-          assigned_rep:user_profiles!assigned_rep_id(id, full_name, email)
+          assigned_rep:user_profiles(id, full_name, email)
         `)?.single();
 
       if (error) {
@@ -134,6 +130,11 @@ export const accountsService = {
         
         if (error?.code === '23503') {
           return { success: false, error: 'Invalid assigned representative' };
+        }
+
+        // Handle tenant-related errors
+        if (error?.message?.includes('tenant')) {
+          return { success: false, error: 'Unable to determine organization. Please contact support.' };
         }
 
         return { success: false, error: error?.message };
@@ -156,7 +157,7 @@ export const accountsService = {
         updated_at: new Date()?.toISOString() 
       })?.eq('id', accountId)?.select(`
           *,
-          assigned_rep:user_profiles!assigned_rep_id(id, full_name, email)
+          assigned_rep:user_profiles(id, full_name, email)
         `)?.single();
 
       if (error) {

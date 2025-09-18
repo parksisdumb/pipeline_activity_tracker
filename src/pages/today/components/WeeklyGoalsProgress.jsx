@@ -15,6 +15,7 @@ const WeeklyGoalsProgress = ({ className = '' }) => {
   // Define weekly goals (these could come from user settings later)
   const weeklyGoalTargets = {
     'Phone Call': 20,
+    'Email': 30, // Added email target
     'Site Visit': 15, // Pop-ins
     'Meeting': 10, // DM Conversations  
     'Assessment': 5,
@@ -75,6 +76,16 @@ const WeeklyGoalsProgress = ({ className = '' }) => {
     },
     {
       id: 2,
+      label: "Emails", // Added Email tracking
+      type: "Email",
+      current: weeklyStats?.['Email'] || 0,
+      target: weeklyGoalTargets?.['Email'],
+      icon: "Mail",
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-100"
+    },
+    {
+      id: 3,
       label: "Site Visits",
       type: "Site Visit", 
       current: weeklyStats?.['Site Visit'] || 0,
@@ -84,7 +95,7 @@ const WeeklyGoalsProgress = ({ className = '' }) => {
       bgColor: "bg-green-100"
     },
     {
-      id: 3,
+      id: 4,
       label: "Meetings",
       type: "Meeting",
       current: weeklyStats?.['Meeting'] || 0,
@@ -94,7 +105,7 @@ const WeeklyGoalsProgress = ({ className = '' }) => {
       bgColor: "bg-purple-100"
     },
     {
-      id: 4,
+      id: 5,
       label: "Assessments",
       type: "Assessment", 
       current: weeklyStats?.['Assessment'] || 0,
@@ -104,7 +115,7 @@ const WeeklyGoalsProgress = ({ className = '' }) => {
       bgColor: "bg-orange-100"
     },
     {
-      id: 5,
+      id: 6,
       label: "Proposals",
       type: "Proposal Sent",
       current: weeklyStats?.['Proposal Sent'] || 0,
@@ -172,7 +183,7 @@ const WeeklyGoalsProgress = ({ className = '' }) => {
           </button>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         {weeklyGoals?.map((goal) => {
           const progress = calculateProgress(goal?.current, goal?.target);
           const isComplete = goal?.current >= goal?.target;

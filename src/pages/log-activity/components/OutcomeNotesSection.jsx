@@ -12,15 +12,16 @@ const OutcomeNotesSection = ({
   notesError,
   disabled = false 
 }) => {
+  // Fixed: Use correct database enum values for activity_outcome
   const outcomeOptions = [
-    { value: 'positive', label: 'Positive', description: 'Good response or progress made' },
-    { value: 'neutral', label: 'Neutral', description: 'Standard interaction, no clear outcome' },
-    { value: 'negative', label: 'Negative', description: 'Poor response or setback' },
-    { value: 'follow_up_needed', label: 'Follow-up Needed', description: 'Requires additional action' },
-    { value: 'appointment_scheduled', label: 'Appointment Scheduled', description: 'Next meeting booked' },
-    { value: 'proposal_requested', label: 'Proposal Requested', description: 'Client requested formal proposal' },
-    { value: 'not_interested', label: 'Not Interested', description: 'Client declined or not interested' },
-    { value: 'decision_pending', label: 'Decision Pending', description: 'Waiting for client decision' }
+    { value: 'Successful', label: 'Successful', description: 'Activity completed successfully' },
+    { value: 'No Answer', label: 'No Answer', description: 'No response from contact' },
+    { value: 'Callback Requested', label: 'Callback Requested', description: 'Contact requested a callback' },
+    { value: 'Not Interested', label: 'Not Interested', description: 'Contact not interested' },
+    { value: 'Interested', label: 'Interested', description: 'Contact showed interest' },
+    { value: 'Proposal Requested', label: 'Proposal Requested', description: 'Contact requested a proposal' },
+    { value: 'Meeting Scheduled', label: 'Meeting Scheduled', description: 'Follow-up meeting scheduled' },
+    { value: 'Contract Signed', label: 'Contract Signed', description: 'Contract successfully signed' }
   ];
 
   return (

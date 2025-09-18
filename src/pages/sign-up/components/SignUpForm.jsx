@@ -128,15 +128,16 @@ const SignUpForm = ({ onSubmit, loading }) => {
         // Call parent's onSubmit
         onSubmit?.(formData);
         
-        // Redirect to login after a short delay
+        // Redirect to email confirmation page instead of login
         setTimeout(() => {
-          navigate('/login', { 
+          navigate('/email-confirmation', { 
             state: { 
               email: formData?.email,
-              message: 'Account created! Please check your email to verify your account, then sign in.' 
+              needsConfirmation: true,
+              message: 'Account created! Please check your email to verify your account.' 
             } 
           });
-        }, 3000);
+        }, 2000);
       } else {
         setError(result?.error || 'Registration failed. Please try again.');
       }
@@ -229,6 +230,7 @@ const SignUpForm = ({ onSubmit, loading }) => {
           Role
         </label>
         <Select
+          ref={null}
           id="role"
           name="role"
           value={formData?.role}
@@ -347,9 +349,9 @@ const SignUpForm = ({ onSubmit, loading }) => {
 
       <div className="text-center mt-4">
         <p className="text-sm text-muted-foreground">
-          <strong>MVP Phase Multi-Tenant Setup:</strong><br/>
-          New accounts are automatically configured for your organization. 
-          Role selection determines access permissions within the CRM system.
+          <strong>Email Verification Required:</strong><br/>
+          After creating your account, you'll receive a confirmation email. 
+          Click the link in the email to verify your account and complete setup.
         </p>
       </div>
     </form>

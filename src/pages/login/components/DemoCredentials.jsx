@@ -5,27 +5,27 @@ import Icon from '../../../components/AppIcon';
 const DemoCredentials = ({ onCredentialSelect, className = '' }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const demoAccounts = [
+  const demoCredentials = [
     {
-      role: 'Sales Representative',
-      email: 'rep@roofingcrm.com',
-      password: 'rep123',
-      description: 'Field sales rep with activity logging access',
-      icon: 'User'
-    },
-    {
-      role: 'Sales Manager',
-      email: 'manager@roofingcrm.com',
-      password: 'manager123',
-      description: 'Team manager with dashboard and goal setting',
-      icon: 'Users'
-    },
-    {
-      role: 'Administrator',
-      email: 'admin@roofingcrm.com',
-      password: 'admin123',
-      description: 'Full system access and organization management',
+      email: 'admin@acmeroofing.com',
+      password: 'password123',
+      role: 'Admin',
+      description: 'Tenant Admin Access',
       icon: 'Shield'
+    },
+    {
+      email: 'manager@summitpm.com', 
+      password: 'password123',
+      role: 'Manager',
+      description: 'Property Manager Access',
+      icon: 'BarChart3'
+    },
+    {
+      email: 'team@dillyos.com',
+      password: 'Rom@ns_116',
+      role: 'Super Admin',
+      description: 'Cross-Tenant Super Admin Access',
+      icon: 'Crown'
     }
   ];
 
@@ -58,15 +58,25 @@ const DemoCredentials = ({ onCredentialSelect, className = '' }) => {
             Click any account below to auto-fill login credentials
           </p>
           
-          {demoAccounts?.map((account, index) => (
+          {demoCredentials?.map((account, index) => (
             <button
               key={index}
               onClick={() => handleCredentialClick(account)}
               className="w-full text-left p-3 bg-card border border-border rounded-md hover:bg-muted transition-colors duration-200"
             >
               <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Icon name={account?.icon} size={16} className="text-primary" />
+                <div className={`w-8 h-8 ${
+                  account?.role === 'Super Admin' ? 'bg-red-500' :
+                  account?.role === 'Admin' ? 'bg-purple-500' : 'bg-primary'
+                }/10 rounded-lg flex items-center justify-center flex-shrink-0`}>
+                  <Icon 
+                    name={account?.icon} 
+                    size={16} 
+                    className={
+                      account?.role === 'Super Admin' ? 'text-red-500' :
+                      account?.role === 'Admin' ? 'text-purple-500' : 'text-primary'
+                    } 
+                  />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between mb-1">
@@ -90,6 +100,30 @@ const DemoCredentials = ({ onCredentialSelect, className = '' }) => {
               </div>
             </button>
           ))}
+
+          {/* Special Super Admin Badge */}
+          <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-lg p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                  <Icon name="Crown" size={16} className="text-white" />
+                </div>
+                <div>
+                  <div className="font-medium text-white">Super Administrator</div>
+                  <div className="text-xs text-red-100">Complete system control</div>
+                </div>
+              </div>
+              <button
+                onClick={() => handleCredentialClick({
+                  email: 'team@dillyos.com',
+                  password: 'Rom@ns_116'
+                })}
+                className="text-xs px-3 py-1 bg-white/20 text-white rounded-full hover:bg-white/30 transition-colors"
+              >
+                Use Super Admin
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { goalsService } from '../../services/goalsService';
 import { activitiesService } from '../../services/activitiesService';
+import { authService } from '../../services/authService';
 import Header from '../../components/ui/Header';
 import SidebarNavigation from '../../components/ui/SidebarNavigation';
 import Button from '../../components/ui/Button';
@@ -30,13 +31,17 @@ const WeeklyGoals = () => {
   const [userGoals, setUserGoals] = useState([]);
   const [goalStats, setGoalStats] = useState(null);
   const [actualProgress, setActualProgress] = useState({});
+  
+  // New state for real representatives data
+  const [representatives, setRepresentatives] = useState([]);
+  const [repsLoading, setRepsLoading] = useState(true);
 
   // Determine if this is manager or rep view
   const isRepView = userProfile?.role === 'rep';
   const weekStartDate = currentWeek?.toISOString()?.split('T')?.[0];
 
   // Mock data for representatives
-  const representatives = [
+  const mockRepresentatives = [
     {
       id: "rep1",
       name: "Sarah Johnson",
@@ -94,6 +99,55 @@ const WeeklyGoals = () => {
     rep3: { pop_ins: 15, dm_conversations: 10, assessments_booked: 4, proposals_sent: 3, wins: 1 },
     rep4: { pop_ins: 8, dm_conversations: 4, assessments_booked: 2, proposals_sent: 1, wins: 0 },
     rep5: { pop_ins: 18, dm_conversations: 11, assessments_booked: 5, proposals_sent: 4, wins: 2 }
+  };
+
+  // Load representatives from database (for managers)
+  useEffect(() => {
+    if (!isRepView && userProfile?.role === 'manager') {
+      loadRepresentatives();
+    } else {
+      setRepsLoading(false);
+    }
+  }, [isRepView, userProfile?.role]);
+
+  const loadRepresentatives = async () => {
+    setRepsLoading(true);
+    try {
+      const result = await authService?.getRepresentatives();
+      if (result?.success && result?.data?.length > 0) {
+        // Transform database format to component format
+        const formattedReps = result?.data?.map(rep => ({
+          id: rep?.id,
+          name: rep?.full_name || 'Unknown Rep',
+          role: 'Sales Representative',
+          email: rep?.email || ''
+        }));
+        setRepresentatives(formattedReps);
+        
+        // Initialize goals structure for real reps
+        const initialGoals = {};
+        formattedReps?.forEach(rep => {
+          initialGoals[rep?.id] = {
+            pop_ins: 20,
+            dm_conversations: 12,
+            assessments_booked: 6,
+            proposals_sent: 4,
+            wins: 2
+          };
+        });
+        setCurrentWeekGoals(initialGoals);
+      } else {
+        // Fallback to mock data if no real reps found
+        console.log('No real representatives found, using mock data');
+        setRepresentatives(mockRepresentatives);
+      }
+    } catch (error) {
+      console.error('Error loading representatives:', error);
+      // Fallback to mock data on error
+      setRepresentatives(mockRepresentatives);
+    } finally {
+      setRepsLoading(false);
+    }
   };
 
   // Load user's goals and progress (for reps)
@@ -197,6 +251,10 @@ const WeeklyGoals = () => {
     setMobileMenuOpen(!mobileMenuOpen);
   };
 
+  // Update loading state to include reps loading
+  const isManagerLoading = !isRepView && repsLoading;
+  const isRepLoading = isRepView && loading;
+
   // Show individual rep view
   if (isRepView) {
     return (
@@ -249,7 +307,7 @@ const WeeklyGoals = () => {
     );
   }
 
-  // Show manager view (existing functionality)
+  // Show manager view with loading state
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop Sidebar */}
@@ -315,81 +373,118 @@ const WeeklyGoals = () => {
             </div>
           </div>
 
-          {/* Week Selection */}
-          <WeekSelector
-            currentWeek={currentWeek}
-            onWeekChange={handleWeekChange}
-          />
-
-          {/* Progress Summary */}
-          <GoalProgressSummary
-            representatives={representatives}
-            currentWeekGoals={currentWeekGoals}
-            currentWeekPerformance={currentWeekPerformance}
-          />
-
-          {/* Bulk Actions */}
-          <BulkGoalActions
-            representatives={representatives}
-            onBulkGoalSet={handleBulkGoalSet}
-            onCopyFromPreviousWeek={handleCopyFromPreviousWeek}
-          />
-
-          {/* Desktop Goals Table */}
-          <div className="hidden lg:block space-y-4">
-            <GoalMetricsHeader />
-            
-            <div className="space-y-3">
-              {representatives?.map((rep) => (
-                <RepGoalRow
-                  key={rep?.id}
-                  rep={rep}
-                  goals={currentWeekGoals?.[rep?.id] || {}}
-                  previousWeekPerformance={previousWeekPerformance?.[rep?.id]}
-                  onGoalChange={handleGoalChange}
-                />
-              ))}
+          {/* Loading State for Manager */}
+          {isManagerLoading && (
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="mt-2 text-muted-foreground">Loading team representatives...</p>
             </div>
-          </div>
+          )}
 
-          {/* Mobile Goals Cards */}
-          <div className="lg:hidden space-y-4">
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <Icon name="Smartphone" size={16} />
-              <span>Tap any card to edit goals</span>
-            </div>
-            
-            {representatives?.map((rep) => (
-              <MobileGoalCard
-                key={rep?.id}
-                rep={rep}
-                goals={currentWeekGoals?.[rep?.id] || {}}
-                previousWeekPerformance={previousWeekPerformance?.[rep?.id]}
-                onGoalChange={handleGoalChange}
+          {/* Show content when not loading */}
+          {!isManagerLoading && (
+            <>
+              {/* Week Selection */}
+              <WeekSelector
+                currentWeek={currentWeek}
+                onWeekChange={handleWeekChange}
               />
-            ))}
-          </div>
 
-          {/* Action Summary */}
-          <div className="bg-card border border-border rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Icon name="CheckCircle" size={20} className="text-success" />
-                <span className="font-medium text-foreground">
-                  Goals updated for week of {currentWeek?.toLocaleDateString('en-US', { 
-                    month: 'long', 
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}
-                </span>
-              </div>
-              
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <Icon name="Clock" size={16} />
-                <span>Last updated: {new Date()?.toLocaleTimeString()}</span>
-              </div>
-            </div>
-          </div>
+              {/* No Reps Message */}
+              {representatives?.length === 0 && (
+                <div className="text-center py-12 bg-card border border-border rounded-lg">
+                  <Icon name="Users" size={48} className="mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium text-foreground mb-2">No Team Representatives Found</h3>
+                  <p className="text-muted-foreground mb-4">
+                    There are no sales representatives in your team yet.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/admin-dashboard')}
+                    iconName="UserPlus"
+                    iconPosition="left"
+                  >
+                    Add Team Members
+                  </Button>
+                </div>
+              )}
+
+              {/* Show goals interface when reps exist */}
+              {representatives?.length > 0 && (
+                <>
+                  {/* Progress Summary */}
+                  <GoalProgressSummary
+                    representatives={representatives}
+                    currentWeekGoals={currentWeekGoals}
+                    currentWeekPerformance={currentWeekPerformance}
+                  />
+
+                  {/* Bulk Actions */}
+                  <BulkGoalActions
+                    representatives={representatives}
+                    onBulkGoalSet={handleBulkGoalSet}
+                    onCopyFromPreviousWeek={handleCopyFromPreviousWeek}
+                  />
+
+                  {/* Desktop Goals Table */}
+                  <div className="hidden lg:block space-y-4">
+                    <GoalMetricsHeader />
+                    
+                    <div className="space-y-3">
+                      {representatives?.map((rep) => (
+                        <RepGoalRow
+                          key={rep?.id}
+                          rep={rep}
+                          goals={currentWeekGoals?.[rep?.id] || {}}
+                          previousWeekPerformance={previousWeekPerformance?.[rep?.id]}
+                          onGoalChange={handleGoalChange}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Mobile Goals Cards */}
+                  <div className="lg:hidden space-y-4">
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <Icon name="Smartphone" size={16} />
+                      <span>Tap any card to edit goals</span>
+                    </div>
+                    
+                    {representatives?.map((rep) => (
+                      <MobileGoalCard
+                        key={rep?.id}
+                        rep={rep}
+                        goals={currentWeekGoals?.[rep?.id] || {}}
+                        previousWeekPerformance={previousWeekPerformance?.[rep?.id]}
+                        onGoalChange={handleGoalChange}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Action Summary */}
+                  <div className="bg-card border border-border rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Icon name="CheckCircle" size={20} className="text-success" />
+                        <span className="font-medium text-foreground">
+                          Goals updated for {representatives?.length} rep{representatives?.length !== 1 ? 's' : ''} - Week of {currentWeek?.toLocaleDateString('en-US', { 
+                            month: 'long', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                        <Icon name="Clock" size={16} />
+                        <span>Last updated: {new Date()?.toLocaleTimeString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -31,7 +31,10 @@ const AddAccountModal = ({ isOpen, onClose, onAccountAdded }) => {
     'Facility Manager',
     'Roofing Contractor',
     'Insurance',
-    'Architecture/Engineering'
+    'Architecture/Engineering',
+    'Commercial Office',
+    'Retail',
+    'Healthcare'
   ];
 
   const handleInputChange = (field, value) => {
@@ -123,10 +126,17 @@ const AddAccountModal = ({ isOpen, onClose, onAccountAdded }) => {
           <Select
             label="Company Type *"
             value={formData?.company_type}
-            onChange={(e) => handleInputChange('company_type', e?.target?.value)}
+            onChange={(value) => handleInputChange('company_type', value)}
+            onSearchChange={() => {}}
             options={companyTypes?.map(type => ({ value: type, label: type }))}
             disabled={loading}
             required
+            error=""
+            id="company_type"
+            onOpenChange={() => {}}
+            name="company_type"
+            description=""
+            ref={null}
           />
 
           <Input

@@ -5,7 +5,7 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 
-const ContactsTab = ({ accountId, contacts, onAddContact }) => {
+const ContactsTab = ({ accountId, contacts, loading, onAddContact, onRefreshContacts }) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStage, setFilterStage] = useState('');
@@ -37,6 +37,7 @@ const ContactsTab = ({ accountId, contacts, onAddContact }) => {
   const filteredContacts = contacts?.filter(contact => {
     const matchesSearch = contact?.name?.toLowerCase()?.includes(searchTerm?.toLowerCase()) ||
                          contact?.role?.toLowerCase()?.includes(searchTerm?.toLowerCase()) ||
+                         contact?.title?.toLowerCase()?.includes(searchTerm?.toLowerCase()) ||
                          (contact?.email && contact?.email?.toLowerCase()?.includes(searchTerm?.toLowerCase()));
     const matchesStage = !filterStage || contact?.stage === filterStage;
     
@@ -44,7 +45,7 @@ const ContactsTab = ({ accountId, contacts, onAddContact }) => {
   });
 
   const handleContactClick = (contactId) => {
-    navigate(`/contact-details?id=${contactId}`);
+    navigate(`/contact-details/${contactId}`);
   };
 
   const handleCall = (e, phone) => {
@@ -57,22 +58,61 @@ const ContactsTab = ({ accountId, contacts, onAddContact }) => {
     window.location.href = `mailto:${email}`;
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <h3 className="text-lg font-semibold text-foreground">
+            Contacts
+          </h3>
+          <Button 
+            onClick={onAddContact}
+            iconName="Plus"
+            iconPosition="left"
+            size="sm"
+          >
+            Add Contact
+          </Button>
+        </div>
+        
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading contacts...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header with Add Button */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h3 className="text-lg font-semibold text-foreground">
-          Contacts ({contacts?.length})
+          Contacts ({contacts?.length || 0})
         </h3>
-        <Button 
-          onClick={onAddContact}
-          iconName="Plus"
-          iconPosition="left"
-          size="sm"
-        >
-          Add Contact
-        </Button>
+        <div className="flex gap-2">
+          {onRefreshContacts && (
+            <Button 
+              onClick={onRefreshContacts}
+              iconName="RefreshCw"
+              size="sm"
+              variant="outline"
+            >
+              Refresh
+            </Button>
+          )}
+          <Button 
+            onClick={onAddContact}
+            iconName="Plus"
+            iconPosition="left"
+            size="sm"
+          >
+            Add Contact
+          </Button>
+        </div>
       </div>
+      
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
@@ -87,8 +127,16 @@ const ContactsTab = ({ accountId, contacts, onAddContact }) => {
           options={stageOptions}
           value={filterStage}
           onChange={setFilterStage}
+          onSearchChange={() => {}}
+          error=""
+          id="stage-filter"
+          onOpenChange={() => {}}
+          label=""
+          name="stage-filter"
+          description=""
         />
       </div>
+      
       {/* Contacts List */}
       {filteredContacts?.length === 0 ? (
         <div className="text-center py-12">
@@ -130,12 +178,12 @@ const ContactsTab = ({ accountId, contacts, onAddContact }) => {
                         {contact?.name}
                       </h4>
                       <p className="text-sm text-muted-foreground truncate">
-                        {contact?.role}
+                        {contact?.title || contact?.role}
                       </p>
-                      {contact?.property && (
-                        <p className="text-xs text-muted-foreground truncate">
-                          {contact?.property}
-                        </p>
+                      {contact?.is_primary_contact && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 mt-1">
+                          Primary Contact
+                        </span>
                       )}
                     </div>
                     

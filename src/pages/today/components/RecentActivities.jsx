@@ -38,13 +38,13 @@ const RecentActivities = ({ className = '' }) => {
     setRefreshKey(prev => prev + 1);
   };
 
-  // Auto-refresh every 30 seconds when tab is active
+  // Auto-refresh every 30 seconds when tab is active and reduce refresh time for better UX
   useEffect(() => {
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         handleRefresh();
       }
-    }, 30000);
+    }, 15000); // Reduced from 30s to 15s for faster updates
 
     return () => clearInterval(interval);
   }, []);

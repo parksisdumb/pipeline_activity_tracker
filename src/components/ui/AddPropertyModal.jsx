@@ -4,12 +4,15 @@ import Input from './Input';
 import Select from './Select';
 import Button from './Button';
 import { propertiesService } from '../../services/propertiesService';
+import { contactsService } from '../../services/contactsService';
 
 const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccountId = null }) => {
   const [loading, setLoading] = useState(false);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [loadingContacts, setLoadingContacts] = useState(false);
   const [error, setError] = useState('');
   const [accounts, setAccounts] = useState([]);
+  const [contacts, setContacts] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -21,9 +24,65 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
     square_footage: '',
     year_built: '',
     account_id: preselectedAccountId || '',
+    primary_contact_id: '', // Add contact assignment field
     notes: ''
   });
 
+  // US States options for the state dropdown
+  const stateOptions = [
+    { value: 'AL', label: 'Alabama' },
+    { value: 'AK', label: 'Alaska' },
+    { value: 'AZ', label: 'Arizona' },
+    { value: 'AR', label: 'Arkansas' },
+    { value: 'CA', label: 'California' },
+    { value: 'CO', label: 'Colorado' },
+    { value: 'CT', label: 'Connecticut' },
+    { value: 'DE', label: 'Delaware' },
+    { value: 'FL', label: 'Florida' },
+    { value: 'GA', label: 'Georgia' },
+    { value: 'HI', label: 'Hawaii' },
+    { value: 'ID', label: 'Idaho' },
+    { value: 'IL', label: 'Illinois' },
+    { value: 'IN', label: 'Indiana' },
+    { value: 'IA', label: 'Iowa' },
+    { value: 'KS', label: 'Kansas' },
+    { value: 'KY', label: 'Kentucky' },
+    { value: 'LA', label: 'Louisiana' },
+    { value: 'ME', label: 'Maine' },
+    { value: 'MD', label: 'Maryland' },
+    { value: 'MA', label: 'Massachusetts' },
+    { value: 'MI', label: 'Michigan' },
+    { value: 'MN', label: 'Minnesota' },
+    { value: 'MS', label: 'Mississippi' },
+    { value: 'MO', label: 'Missouri' },
+    { value: 'MT', label: 'Montana' },
+    { value: 'NE', label: 'Nebraska' },
+    { value: 'NV', label: 'Nevada' },
+    { value: 'NH', label: 'New Hampshire' },
+    { value: 'NJ', label: 'New Jersey' },
+    { value: 'NM', label: 'New Mexico' },
+    { value: 'NY', label: 'New York' },
+    { value: 'NC', label: 'North Carolina' },
+    { value: 'ND', label: 'North Dakota' },
+    { value: 'OH', label: 'Ohio' },
+    { value: 'OK', label: 'Oklahoma' },
+    { value: 'OR', label: 'Oregon' },
+    { value: 'PA', label: 'Pennsylvania' },
+    { value: 'RI', label: 'Rhode Island' },
+    { value: 'SC', label: 'South Carolina' },
+    { value: 'SD', label: 'South Dakota' },
+    { value: 'TN', label: 'Tennessee' },
+    { value: 'TX', label: 'Texas' },
+    { value: 'UT', label: 'Utah' },
+    { value: 'VT', label: 'Vermont' },
+    { value: 'VA', label: 'Virginia' },
+    { value: 'WA', label: 'Washington' },
+    { value: 'WV', label: 'West Virginia' },
+    { value: 'WI', label: 'Wisconsin' },
+    { value: 'WY', label: 'Wyoming' }
+  ];
+
+  // Database enum values - matching exact schema
   const buildingTypes = [
     'Industrial',
     'Warehouse', 
@@ -57,20 +116,29 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
         ...prev,
         account_id: preselectedAccountId
       }));
+      loadContactsForAccount(preselectedAccountId);
     }
   }, [preselectedAccountId]);
+
+  // Load contacts when account changes
+  useEffect(() => {
+    if (formData?.account_id && formData?.account_id !== preselectedAccountId) {
+      loadContactsForAccount(formData?.account_id);
+    } else if (!formData?.account_id) {
+      setContacts([]);
+      setFormData(prev => ({ ...prev, primary_contact_id: '' }));
+    }
+  }, [formData?.account_id]);
 
   const loadAccounts = async () => {
     setLoadingAccounts(true);
     try {
-      // Use the new method to get all available accounts for shared access
-      const result = await propertiesService?.getAllAvailableAccounts();
+      const result = await propertiesService?.getUserAssignedAccounts();
       if (result?.success) {
         setAccounts(result?.data || []);
         
-        // Show helpful message if no accounts are available
         if (!result?.data?.length) {
-          setError('No active accounts available. Please contact your administrator.');
+          setError('No accounts assigned to you. Please contact your manager to assign accounts before creating properties.');
         }
       } else {
         setError(result?.error || 'Failed to load accounts');
@@ -83,7 +151,36 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
     }
   };
 
+  const loadContactsForAccount = async (accountId) => {
+    if (!accountId) return;
+    
+    setLoadingContacts(true);
+    try {
+      const result = await contactsService?.getContactsByAccount(accountId);
+      if (result?.success) {
+        setContacts(result?.data || []);
+      } else {
+        console.error('Failed to load contacts:', result?.error);
+        setContacts([]);
+      }
+    } catch (err) {
+      console.error('Load contacts error:', err);
+      setContacts([]);
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
+
   const handleInputChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    if (error) setError('');
+  };
+
+  // New handler specifically for select components
+  const handleSelectChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -134,6 +231,9 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
         year_built: formData?.year_built ? parseInt(formData?.year_built) : null
       };
 
+      // Remove primary_contact_id from property data as it's not a property field
+      delete propertyData?.primary_contact_id;
+
       const result = await propertiesService?.createProperty(propertyData);
       
       if (result?.success) {
@@ -162,15 +262,33 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
       square_footage: '',
       year_built: '',
       account_id: preselectedAccountId || '',
+      primary_contact_id: '',
       notes: ''
     });
     setError('');
+    setContacts([]);
     onClose?.();
   };
 
+  // Transform data for Select components
   const accountOptions = accounts?.map(account => ({
     value: account?.id,
     label: `${account?.name} (${account?.company_type})`
+  }));
+
+  const buildingTypeOptions = buildingTypes?.map(type => ({
+    value: type,
+    label: type
+  }));
+
+  const roofTypeOptions = roofTypes?.map(type => ({
+    value: type,
+    label: type
+  }));
+
+  const contactOptions = contacts?.map(contact => ({
+    value: contact?.id,
+    label: `${contact?.first_name} ${contact?.last_name}${contact?.title ? ` - ${contact?.title}` : ''}${contact?.is_primary_contact ? ' (Primary)' : ''}`
   }));
 
   return (
@@ -192,11 +310,11 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
           </div>
         )}
 
-        {/* Updated account selection info */}
+        {/* Show account selection info */}
         {!loadingAccounts && accounts?.length > 0 && (
-          <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-            <p className="text-sm text-green-700">
-              You can create properties for any active account ({accounts?.length} available).
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-700">
+              You can only create properties for accounts assigned to you ({accounts?.length} available).
             </p>
           </div>
         )}
@@ -214,23 +332,47 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
           <Select
             label="Account *"
             value={formData?.account_id}
-            onChange={(e) => handleInputChange('account_id', e?.target?.value)}
+            onChange={(value) => handleInputChange('account_id', value)}
+            onSearchChange={() => {}}
+            error=""
+            id="account-select"
+            onOpenChange={() => {}}
+            name="account_id"
+            description=""
             options={accountOptions}
             placeholder={
               loadingAccounts 
                 ? "Loading accounts..." 
                 : accounts?.length === 0 
-                  ? "No accounts available" 
-                  : "Select an account"
+                  ? "No accounts available" : "Select an account"
             }
             disabled={loading || loadingAccounts || accounts?.length === 0}
             required
-            id="account_id"
-            name="account_id"
-            error=""
-            description=""
+            ref={null}
+          />
+
+          <Select
+            label="Primary Contact"
+            value={formData?.primary_contact_id}
+            onChange={(value) => handleInputChange('primary_contact_id', value)}
             onSearchChange={() => {}}
+            error=""
+            id="primary-contact-select"
             onOpenChange={() => {}}
+            name="primary_contact_id"
+            description=""
+            options={contactOptions}
+            placeholder={
+              !formData?.account_id 
+                ? "Select account first" 
+                : loadingContacts 
+                  ? "Loading contacts..." 
+                  : contacts?.length === 0 
+                    ? "No contacts available" : "Select primary contact (optional)"
+            }
+            disabled={loading || !formData?.account_id || loadingContacts}
+            clearable
+            ref={null}
           />
 
           <Input
@@ -252,12 +394,21 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
           />
 
           <div className="grid grid-cols-2 gap-2">
-            <Input
+            <Select
               label="State"
               value={formData?.state}
-              onChange={(e) => handleInputChange('state', e?.target?.value)}
-              placeholder="TX"
+              onChange={(value) => handleInputChange('state', value)}
+              onSearchChange={() => {}}
+              error=""
+              id="state-select"
+              onOpenChange={() => {}}
+              name="state"
+              description=""
+              options={stateOptions}
+              placeholder="Select state"
               disabled={loading}
+              searchable
+              ref={null}
             />
             <Input
               label="ZIP Code"
@@ -271,30 +422,36 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
           <Select
             label="Building Type *"
             value={formData?.building_type}
-            onChange={(e) => handleInputChange('building_type', e?.target?.value)}
-            options={buildingTypes?.map(type => ({ value: type, label: type }))}
+            onChange={(value) => handleInputChange('building_type', value)}
+            onSearchChange={() => {}}
+            error=""
+            id="building-type-select"
+            onOpenChange={() => {}}
+            name="building_type"
+            description=""
+            options={buildingTypeOptions}
             disabled={loading}
             required
-            id="building_type"
-            name="building_type"
-            error=""
-            description=""
-            onSearchChange={() => {}}
-            onOpenChange={() => {}}
+            placeholder="Select building type"
+            searchable
+            ref={null}
           />
 
           <Select
             label="Roof Type"
             value={formData?.roof_type}
-            onChange={(e) => handleInputChange('roof_type', e?.target?.value)}
-            options={roofTypes?.map(type => ({ value: type, label: type }))}
-            disabled={loading}
-            id="roof_type"
-            name="roof_type"
-            error=""
-            description=""
+            onChange={(value) => handleInputChange('roof_type', value)}
             onSearchChange={() => {}}
+            error=""
+            id="roof-type-select"
             onOpenChange={() => {}}
+            name="roof_type"
+            description=""
+            options={roofTypeOptions}
+            disabled={loading}
+            placeholder="Select roof type"
+            searchable
+            ref={null}
           />
 
           <Input
