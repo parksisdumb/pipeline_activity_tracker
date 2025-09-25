@@ -103,16 +103,28 @@ const PropertiesList = () => {
       return matchesSearch && matchesBuildingType && matchesRoofType && matchesStage;
     });
 
-    // Sort properties
+    // Sort properties - Handle special sorting cases
     if (sortConfig?.key) {
       filtered?.sort((a, b) => {
         let aValue = a?.[sortConfig?.key];
         let bValue = b?.[sortConfig?.key];
 
+        // Handle special cases for nested account data
+        if (sortConfig?.key === 'account_id') {
+          aValue = a?.account?.name || '';
+          bValue = b?.account?.name || '';
+        }
+
         // Handle special cases
         if (sortConfig?.key === 'last_assessment') {
           aValue = aValue ? new Date(aValue) : new Date(0);
           bValue = bValue ? new Date(bValue) : new Date(0);
+        }
+
+        // Handle string comparison
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          aValue = aValue?.toLowerCase();
+          bValue = bValue?.toLowerCase();
         }
 
         if (aValue < bValue) {

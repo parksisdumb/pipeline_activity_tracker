@@ -113,6 +113,7 @@ const LinkPropertyModal = ({ isOpen, onClose, contact, onSuccess }) => {
 
   console.log('LinkPropertyModal Debug:', debugInfo);
 
+  // Convert properties to options format that the Select component expects
   const propertyOptions = availableProperties?.map(property => ({
     value: property?.id,
     label: `${property?.name || 'Unnamed Property'} - ${property?.address || 'No Address'}`,
@@ -170,6 +171,7 @@ const LinkPropertyModal = ({ isOpen, onClose, contact, onSuccess }) => {
             <Select
               value={selectedPropertyId}
               onChange={setSelectedPropertyId}
+              options={propertyOptions}
               placeholder={
                 loadingProperties 
                   ? "Loading properties..." 
@@ -177,14 +179,9 @@ const LinkPropertyModal = ({ isOpen, onClose, contact, onSuccess }) => {
                     ? "No properties available" :"Choose a property"
               }
               disabled={loadingProperties || loading || availableProperties?.length === 0}
-            >
-              <option value="">-- Select a Property --</option>
-              {propertyOptions?.map((option) => (
-                <option key={option?.value} value={option?.value}>
-                  {option?.label}
-                </option>
-              ))}
-            </Select>
+              loading={loadingProperties}
+              emptyMessage="No properties found"
+            />
             
             {/* Help text */}
             <div className="mt-2 text-xs text-muted-foreground">

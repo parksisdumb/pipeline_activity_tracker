@@ -68,6 +68,24 @@ const LogActivity = () => {
         setValue('activityType', state?.activityType);
       }
     }
+    // Also handle legacy format for backward compatibility
+    else if (state?.contactId && state?.accountId) {
+      setValue('account', state?.accountId);
+      setValue('contact', state?.contactId);
+      setSelectedEntities(prev => ({ 
+        ...prev, 
+        account: {
+          value: state?.accountId,
+          label: state?.accountName || 'Account',
+          description: 'Account'
+        },
+        contact: {
+          value: state?.contactId,
+          label: state?.contactName || 'Contact',
+          description: 'Contact'
+        }
+      }));
+    }
   }, [location?.state, setValue]);
 
   const handleEntitySelect = (entityType, value) => {

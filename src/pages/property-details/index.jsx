@@ -13,8 +13,8 @@ import { activitiesService } from '../../services/activitiesService';
 import { useAuth } from '../../contexts/AuthContext';
 
 const PropertyDetails = () => {
-  const { id } = useParams();
   const navigate = useNavigate();
+  const { id: propertyId } = useParams();
   const { user } = useAuth();
 
   // UI States
@@ -30,20 +30,20 @@ const PropertyDetails = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (id) {
+    if (propertyId) {
       loadPropertyData();
     }
-  }, [id]);
+  }, [propertyId]);
 
   const loadPropertyData = async () => {
-    if (!id) {
+    if (!propertyId) {
       setError('Property ID is required');
       setLoading(false);
       return;
     }
 
     // Add validation for route parameter issues
-    if (id === ':id' || id?.includes(':id')) {
+    if (propertyId === ':id' || propertyId?.includes(':id')) {
       setError('Invalid property ID. Please navigate from the properties list.');
       setLoading(false);
       return;
@@ -51,7 +51,7 @@ const PropertyDetails = () => {
 
     // Add UUID format validation
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex?.test(id)) {
+    if (!uuidRegex?.test(propertyId)) {
       setError('Invalid property ID format. Please check the URL and try again.');
       setLoading(false);
       return;
@@ -62,7 +62,7 @@ const PropertyDetails = () => {
 
     try {
       // Load property details
-      const propertyResult = await propertiesService?.getProperty(id);
+      const propertyResult = await propertiesService?.getProperty(propertyId);
       if (!propertyResult?.success) {
         setError(propertyResult?.error || 'Failed to load property');
         setLoading(false);
@@ -72,7 +72,7 @@ const PropertyDetails = () => {
       setProperty(propertyResult?.data);
 
       // Load property activities
-      const activitiesResult = await activitiesService?.getActivities({ propertyId: id });
+      const activitiesResult = await activitiesService?.getActivities({ propertyId: propertyId });
       if (activitiesResult?.success) {
         setActivities(activitiesResult?.data || []);
       }

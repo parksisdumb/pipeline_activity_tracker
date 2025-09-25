@@ -21,10 +21,11 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
     zip_code: '',
     building_type: 'Industrial',
     roof_type: 'TPO',
+    stage: 'Unassessed', // Add property stage field
     square_footage: '',
     year_built: '',
     account_id: preselectedAccountId || '',
-    primary_contact_id: '', // Add contact assignment field
+    primary_contact_id: '',
     notes: ''
   });
 
@@ -104,6 +105,17 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
     'BUR'
   ];
 
+  // Add property stage options from database schema
+  const propertyStages = [
+    'Unassessed',
+    'Assessment Scheduled',
+    'Assessed',
+    'Proposal Sent',
+    'In Negotiation',
+    'Won',
+    'Lost'
+  ];
+
   useEffect(() => {
     if (isOpen) {
       loadAccounts();
@@ -172,15 +184,6 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
   };
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    if (error) setError('');
-  };
-
-  // New handler specifically for select components
-  const handleSelectChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -259,6 +262,7 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
       zip_code: '',
       building_type: 'Industrial',
       roof_type: 'TPO',
+      stage: 'Unassessed',
       square_footage: '',
       year_built: '',
       account_id: preselectedAccountId || '',
@@ -284,6 +288,12 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
   const roofTypeOptions = roofTypes?.map(type => ({
     value: type,
     label: type
+  }));
+
+  // Add property stage options
+  const propertyStageOptions = propertyStages?.map(stage => ({
+    value: stage,
+    label: stage
   }));
 
   const contactOptions = contacts?.map(contact => ({
@@ -348,7 +358,6 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
             }
             disabled={loading || loadingAccounts || accounts?.length === 0}
             required
-            ref={null}
           />
 
           <Select
@@ -372,7 +381,6 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
             }
             disabled={loading || !formData?.account_id || loadingContacts}
             clearable
-            ref={null}
           />
 
           <Input
@@ -408,7 +416,6 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
               placeholder="Select state"
               disabled={loading}
               searchable
-              ref={null}
             />
             <Input
               label="ZIP Code"
@@ -434,7 +441,6 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
             required
             placeholder="Select building type"
             searchable
-            ref={null}
           />
 
           <Select
@@ -451,7 +457,22 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
             disabled={loading}
             placeholder="Select roof type"
             searchable
-            ref={null}
+          />
+
+          <Select
+            label="Property Stage"
+            value={formData?.stage}
+            onChange={(value) => handleInputChange('stage', value)}
+            onSearchChange={() => {}}
+            error=""
+            id="property-stage-select"
+            onOpenChange={() => {}}
+            name="stage"
+            description=""
+            options={propertyStageOptions}
+            disabled={loading}
+            placeholder="Select property stage"
+            searchable
           />
 
           <Input

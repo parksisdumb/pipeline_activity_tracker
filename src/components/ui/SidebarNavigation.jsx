@@ -71,21 +71,21 @@ const SidebarNavigation = ({
     },
     { 
       label: 'View All Accounts', 
-      path: '/accounts-list', 
+      path: '/accounts', 
       icon: 'Building2', 
       roles: ['admin'],
       description: 'View all accounts across tenants'
     },
     { 
       label: 'View All Properties', 
-      path: '/properties-list', 
+      path: '/properties', 
       icon: 'MapPin', 
       roles: ['admin'],
       description: 'View all properties across tenants'
     },
     { 
       label: 'View All Contacts', 
-      path: '/contacts-list', 
+      path: '/contacts', 
       icon: 'Users', 
       roles: ['admin'],
       description: 'View all contacts across tenants'
@@ -104,6 +104,13 @@ const SidebarNavigation = ({
       icon: 'Plus', 
       roles: ['rep', 'manager'],
       description: 'Quick activity logging'
+    },
+    { 
+      label: 'Tasks', 
+      path: '/tasks', 
+      icon: 'CheckSquare', 
+      roles: ['rep', 'manager'],
+      description: 'Task management and assignment'
     },
     { 
       label: 'Team Dashboard', 
@@ -128,24 +135,31 @@ const SidebarNavigation = ({
     },
     { 
       label: 'Accounts', 
-      path: '/accounts-list', 
+      path: '/accounts', 
       icon: 'Building2', 
       roles: ['rep', 'manager'],
       description: 'Account management'
     },
     { 
       label: 'Properties', 
-      path: '/properties-list', 
+      path: '/properties', 
       icon: 'MapPin', 
       roles: ['rep', 'manager'],
       description: 'Property tracking'
     },
     { 
       label: 'Contacts', 
-      path: '/contacts-list', 
+      path: '/contacts', 
       icon: 'Users', 
       roles: ['rep', 'manager'],
       description: 'Contact management'
+    },
+    { 
+      label: 'Opportunities', 
+      path: '/opportunities', 
+      icon: 'TrendingUp', 
+      roles: ['rep', 'manager'],
+      description: 'Sales opportunity management'
     },
   ];
 

@@ -2,34 +2,70 @@ import React from 'react';
 import Icon from '../../../components/AppIcon';
 
 const TeamSummaryCards = ({ summaryData, className = '' }) => {
+  // Handle both formats - direct function return and transformed data
+  const getCardValue = (field, fallback = 'N/A') => {
+    if (!summaryData) return fallback;
+    
+    // Handle direct function return format
+    if (Array.isArray(summaryData) && summaryData?.length > 0) {
+      const data = summaryData?.[0];
+      switch (field) {
+        case 'activeReps':
+          return data?.team_size || 0;
+        case 'totalAccounts': 
+          return data?.active_accounts || 0;
+        case 'weeklyRevenue':
+          return data?.total_activities_this_week || 0; // Use activities as proxy for revenue
+        case 'avgDealSize':
+          return data?.total_properties || 0; // Use properties as proxy for deal size
+        default:
+          return fallback;
+      }
+    }
+    
+    // Handle transformed object format (backward compatibility)
+    switch (field) {
+      case 'activeReps':
+        return summaryData?.activeReps || summaryData?.team_size || 0;
+      case 'totalAccounts':
+        return summaryData?.totalAccounts || summaryData?.active_accounts || 0;
+      case 'weeklyRevenue':
+        return summaryData?.weeklyRevenue || summaryData?.total_activities_this_week || 0;
+      case 'avgDealSize':
+        return summaryData?.avgDealSize || summaryData?.total_properties || 0;
+      default:
+        return fallback;
+    }
+  };
+
   const cards = [
     {
       title: 'Active Reps',
-      value: summaryData?.activeReps,
+      value: getCardValue('activeReps'),
       icon: 'Users',
       color: 'accent',
       description: 'Team members'
     },
     {
       title: 'Total Accounts',
-      value: summaryData?.totalAccounts,
+      value: getCardValue('totalAccounts'),
       icon: 'Building2',
       color: 'success',
       description: 'In pipeline'
     },
     {
-      title: 'This Week Revenue',
-      value: `$${summaryData?.weeklyRevenue?.toLocaleString()}`,
-      icon: 'DollarSign',
+      title: 'This Week Activities',
+      value: getCardValue('weeklyRevenue'),
+      icon: 'Activity',
       color: 'warning',
-      description: 'Closed deals'
+      description: 'Team activities'
     },
     {
-      title: 'Avg Deal Size',
-      value: `$${summaryData?.avgDealSize?.toLocaleString()}`,
-      icon: 'TrendingUp',
+      title: 'Total Properties',
+      value: getCardValue('avgDealSize'),
+      icon: 'MapPin',
       color: 'error',
-      description: 'Per opportunity'
+      description: 'Properties managed'
     }
   ];
 

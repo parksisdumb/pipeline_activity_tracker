@@ -40,12 +40,11 @@ const EditAccountModal = ({ isOpen, onClose, onAccountUpdated, account }) => {
 
   const stages = [
     'Prospect',
-    'Contacted', 
-    'Qualified',
-    'Assessment Scheduled',
-    'Proposal Sent',
-    'Won',
-    'Lost'
+    'Contacted',
+    'Vendor Packet Request',
+    'Vendor Packet Submitted',
+    'Approved for Work',
+    'Actively Engaged'
   ];
 
   // Initialize form data when account prop changes

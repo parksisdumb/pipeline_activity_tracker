@@ -124,6 +124,88 @@ export const AuthProvider = ({ children }) => {
     return () => subscription?.unsubscribe()
   }, [])
 
+  // Enhanced signUp method with better error handling and profile creation
+  const signUp = async (email, password, metadata = {}) => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase?.auth?.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: metadata?.fullName || '',
+            role: metadata?.role || 'rep',
+            ...metadata
+          },
+          emailRedirectTo: `${window?.location?.origin}/magic-link-authentication`
+        }
+      });
+
+      if (error) {
+        return { 
+          success: false, 
+          error: error?.message,
+          user: null,
+          session: null,
+          needsConfirmation: false
+        };
+      }
+
+      // If user was created but needs email confirmation
+      if (data?.user && !data?.session) {
+        return {
+          success: true,
+          user: data?.user,
+          session: null,
+          needsConfirmation: true,
+          message: 'Account created! Please check your email to confirm your account before proceeding.'
+        };
+      }
+
+      // If user was created and is immediately signed in (rare case)
+      if (data?.user && data?.session) {
+        return {
+          success: true,
+          user: data?.user,
+          session: data?.session,
+          needsConfirmation: false,
+          message: 'Account created successfully! You are now signed in.'
+        };
+      }
+
+      return {
+        success: false,
+        error: 'Unexpected response from signup process',
+        user: null,
+        session: null,
+        needsConfirmation: false
+      };
+
+    } catch (error) {
+      if (error?.message?.includes('Failed to fetch') || 
+          error?.message?.includes('AuthRetryableFetchError')) {
+        return {
+          success: false,
+          error: 'Cannot connect to authentication service. Your Supabase project may be paused or inactive.',
+          user: null,
+          session: null,
+          needsConfirmation: false
+        };
+      }
+
+      return {
+        success: false,
+        error: error?.message || 'An unexpected error occurred during signup',
+        user: null,
+        session: null,
+        needsConfirmation: false
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Enhanced signIn method with password setup detection
   const signIn = async (email, password) => {
     try {
@@ -139,18 +221,25 @@ export const AuthProvider = ({ children }) => {
       // Get user authentication status
       const { data: authStatus, error: statusError } = await supabase?.rpc(
         'get_user_auth_status',
-        { user_uuid: data?.user?.id }
+        { user_email: email }
       );
 
       if (statusError) {
         console.warn('Could not get auth status:', statusError);
       }
 
+      // Get user profile to check password and profile status
+      const { data: profile, error: profileError } = await supabase
+        ?.from('user_profiles')
+        ?.select('*')
+        ?.eq('id', data?.user?.id)
+        ?.single();
+
       return { 
         data, 
         error: null,
-        needsPasswordSetup: authStatus?.[0]?.needs_setup || false,
-        profileIncomplete: !authStatus?.[0]?.profile_completed || false
+        needsPasswordSetup: profile ? !profile?.password_set : false,
+        profileIncomplete: profile ? !profile?.profile_completed : false
       };
     } catch (error) {
       return { error: { message: 'Network error. Please try again.' } };
@@ -163,7 +252,7 @@ export const AuthProvider = ({ children }) => {
       const currentOrigin = window.location?.origin;
       
       const { error } = await supabase?.auth?.resetPasswordForEmail(email, {
-        redirectTo: `${currentOrigin}/password-setup`
+        redirectTo: `${currentOrigin}/magic-link-authentication`
       });
       
       if (error) {
@@ -186,18 +275,78 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Complete user profile setup
+  // Enhanced sendMagicLink method
+  const sendMagicLink = async (email) => {
+    try {
+      const currentOrigin = window?.location?.origin;
+      
+      // First check if user exists and what their status is
+      const { data: resendCheck, error: resendCheckError } = await supabase?.rpc(
+        'resend_confirmation_workflow',
+        { user_email: email }
+      );
+
+      if (resendCheckError) {
+        console.warn('Could not check resend status:', resendCheckError);
+      } else if (resendCheck?.[0]) {
+        const checkResult = resendCheck?.[0];
+        if (!checkResult?.success) {
+          return {
+            success: false,
+            error: checkResult?.message || 'Cannot send magic link to this email'
+          };
+        }
+      }
+
+      const { error } = await supabase?.auth?.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${currentOrigin}/magic-link-authentication`
+        }
+      });
+      
+      if (error) {
+        return { 
+          success: false, 
+          error: error?.message || 'Magic link sending failed'
+        };
+      }
+      
+      return { 
+        success: true, 
+        message: 'Magic link sent! Please check your email and click the link to sign in.' 
+      };
+    } catch (error) {
+      if (error?.message?.includes('Failed to fetch') || 
+          error?.message?.includes('AuthRetryableFetchError')) {
+        return {
+          success: false,
+          error: 'Cannot connect to authentication service. Your Supabase project may be paused or inactive.'
+        };
+      }
+
+      return { 
+        success: false, 
+        error: 'An unexpected error occurred while sending magic link'
+      };
+    }
+  };
+
+  // Enhanced completeProfileSetup method with the new function
   const completeProfileSetup = async (profileData) => {
     if (!user?.id) {
       return { error: { message: 'No user logged in' } };
     }
     
     try {
-      const { data, error } = await supabase?.rpc('complete_user_profile_setup', {
-        user_uuid: user?.id,
-        full_name_param: profileData?.fullName,
-        organization_param: profileData?.organization || null,
-        role_param: profileData?.role || 'rep'
+      const { data, error } = await supabase?.rpc('complete_user_setup_enhanced', {
+        user_email: user?.email,
+        profile_data: {
+          fullName: profileData?.fullName,
+          role: profileData?.role || 'rep',
+          organization: profileData?.organization || null
+        },
+        mark_password_set: true  // Mark password as set when completing profile
       });
 
       if (error) {
@@ -208,7 +357,11 @@ export const AuthProvider = ({ children }) => {
       if (result?.success) {
         // Reload profile after successful setup
         await profileOperations?.load(user?.id);
-        return { success: true, message: result?.message };
+        return { 
+          success: true, 
+          message: result?.message,
+          redirectTo: result?.redirect_to
+        };
       } else {
         return { error: { message: result?.message } };
       }
@@ -344,7 +497,8 @@ export const AuthProvider = ({ children }) => {
       const isAuthSessionError = (
         error?.message?.includes('Auth session missing') || 
         error?.name === 'AuthSessionMissingError' ||
-        error?.code === 'session_not_found'|| error?.message?.includes('session_not_found') ||
+        error?.code === 'session_not_found' ||
+        error?.message?.includes('session_not_found') ||
         error?.toString()?.includes('Auth session missing')
       );
       
@@ -392,6 +546,7 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  // Enhanced updatePassword method with database tracking
   const updatePassword = async (newPassword) => {
     try {
       const { error } = await supabase?.auth?.updateUser({
@@ -403,6 +558,21 @@ export const AuthProvider = ({ children }) => {
           success: false, 
           error: error?.message || 'Password update failed'
         };
+      }
+
+      // Mark password as set in user profile
+      if (user?.id) {
+        const { error: profileError } = await supabase?.rpc(
+          'complete_password_setup',
+          { 
+            user_uuid: user?.id,
+            mark_password_complete: true
+          }
+        );
+
+        if (profileError) {
+          console.warn('Could not update password status in profile:', profileError);
+        }
       }
       
       return { 
@@ -430,11 +600,13 @@ export const AuthProvider = ({ children }) => {
     userProfile,
     loading,
     profileLoading,
+    signUp,
     signIn,
     signOut,
     updateProfile,
     updatePassword,
     sendPasswordReset,
+    sendMagicLink,
     completeProfileSetup,
     adminForcePasswordReset,
     checkPasswordSetupNeeded,

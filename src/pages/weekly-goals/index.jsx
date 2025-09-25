@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { goalsService } from '../../services/goalsService';
 import { activitiesService } from '../../services/activitiesService';
-import { authService } from '../../services/authService';
+import { managerService } from '../../services/managerService';
 import Header from '../../components/ui/Header';
 import SidebarNavigation from '../../components/ui/SidebarNavigation';
 import Button from '../../components/ui/Button';
@@ -27,145 +27,53 @@ const WeeklyGoals = () => {
     weekStart?.setDate(today?.getDate() - today?.getDay());
     return weekStart;
   });
+  
+  // Core data state
   const [loading, setLoading] = useState(true);
   const [userGoals, setUserGoals] = useState([]);
   const [goalStats, setGoalStats] = useState(null);
   const [actualProgress, setActualProgress] = useState({});
   
-  // New state for real representatives data
+  // Manager state
   const [representatives, setRepresentatives] = useState([]);
   const [repsLoading, setRepsLoading] = useState(true);
-
+  const [teamGoals, setTeamGoals] = useState({});
+  const [teamPerformance, setTeamPerformance] = useState({});
+  const [previousWeekPerformance, setPreviousWeekPerformance] = useState({});
+  
+  // Data synchronization state
+  const [lastDataRefresh, setLastDataRefresh] = useState(Date.now());
+  const [forceRefresh, setForceRefresh] = useState(0);
+  const mountedRef = useRef(true);
+  const dataFetchingRef = useRef(false);
+  
   // Determine if this is manager or rep view
   const isRepView = userProfile?.role === 'rep';
   const weekStartDate = currentWeek?.toISOString()?.split('T')?.[0];
 
-  // Mock data for representatives
-  const mockRepresentatives = [
-    {
-      id: "rep1",
-      name: "Sarah Johnson",
-      role: "Senior Sales Rep",
-      email: "sarah.johnson@company.com"
-    },
-    {
-      id: "rep2", 
-      name: "Mike Rodriguez",
-      role: "Sales Representative",
-      email: "mike.rodriguez@company.com"
-    },
-    {
-      id: "rep3",
-      name: "Emily Chen",
-      role: "Sales Representative", 
-      email: "emily.chen@company.com"
-    },
-    {
-      id: "rep4",
-      name: "David Thompson",
-      role: "Junior Sales Rep",
-      email: "david.thompson@company.com"
-    },
-    {
-      id: "rep5",
-      name: "Lisa Martinez",
-      role: "Senior Sales Rep",
-      email: "lisa.martinez@company.com"
-    }
-  ];
-
-  // Mock current week goals
-  const [currentWeekGoals, setCurrentWeekGoals] = useState({
-    rep1: { pop_ins: 20, dm_conversations: 12, assessments_booked: 6, proposals_sent: 4, wins: 2 },
-    rep2: { pop_ins: 18, dm_conversations: 10, assessments_booked: 5, proposals_sent: 3, wins: 1 },
-    rep3: { pop_ins: 22, dm_conversations: 14, assessments_booked: 7, proposals_sent: 5, wins: 2 },
-    rep4: { pop_ins: 15, dm_conversations: 8, assessments_booked: 4, proposals_sent: 2, wins: 1 },
-    rep5: { pop_ins: 25, dm_conversations: 15, assessments_booked: 8, proposals_sent: 6, wins: 3 }
-  });
-
-  // Mock previous week performance
-  const previousWeekPerformance = {
-    rep1: { pop_ins: 18, dm_conversations: 11, assessments_booked: 5, proposals_sent: 3, wins: 1 },
-    rep2: { pop_ins: 16, dm_conversations: 9, assessments_booked: 4, proposals_sent: 2, wins: 1 },
-    rep3: { pop_ins: 20, dm_conversations: 12, assessments_booked: 6, proposals_sent: 4, wins: 2 },
-    rep4: { pop_ins: 12, dm_conversations: 6, assessments_booked: 3, proposals_sent: 1, wins: 0 },
-    rep5: { pop_ins: 23, dm_conversations: 14, assessments_booked: 7, proposals_sent: 5, wins: 2 }
-  };
-
-  // Mock current week performance (partial)
-  const currentWeekPerformance = {
-    rep1: { pop_ins: 12, dm_conversations: 8, assessments_booked: 3, proposals_sent: 2, wins: 1 },
-    rep2: { pop_ins: 10, dm_conversations: 6, assessments_booked: 2, proposals_sent: 1, wins: 0 },
-    rep3: { pop_ins: 15, dm_conversations: 10, assessments_booked: 4, proposals_sent: 3, wins: 1 },
-    rep4: { pop_ins: 8, dm_conversations: 4, assessments_booked: 2, proposals_sent: 1, wins: 0 },
-    rep5: { pop_ins: 18, dm_conversations: 11, assessments_booked: 5, proposals_sent: 4, wins: 2 }
-  };
-
-  // Load representatives from database (for managers)
-  useEffect(() => {
-    if (!isRepView && userProfile?.role === 'manager') {
-      loadRepresentatives();
-    } else {
-      setRepsLoading(false);
-    }
-  }, [isRepView, userProfile?.role]);
-
-  const loadRepresentatives = async () => {
-    setRepsLoading(true);
-    try {
-      const result = await authService?.getRepresentatives();
-      if (result?.success && result?.data?.length > 0) {
-        // Transform database format to component format
-        const formattedReps = result?.data?.map(rep => ({
-          id: rep?.id,
-          name: rep?.full_name || 'Unknown Rep',
-          role: 'Sales Representative',
-          email: rep?.email || ''
-        }));
-        setRepresentatives(formattedReps);
-        
-        // Initialize goals structure for real reps
-        const initialGoals = {};
-        formattedReps?.forEach(rep => {
-          initialGoals[rep?.id] = {
-            pop_ins: 20,
-            dm_conversations: 12,
-            assessments_booked: 6,
-            proposals_sent: 4,
-            wins: 2
-          };
-        });
-        setCurrentWeekGoals(initialGoals);
-      } else {
-        // Fallback to mock data if no real reps found
-        console.log('No real representatives found, using mock data');
-        setRepresentatives(mockRepresentatives);
-      }
-    } catch (error) {
-      console.error('Error loading representatives:', error);
-      // Fallback to mock data on error
-      setRepresentatives(mockRepresentatives);
-    } finally {
-      setRepsLoading(false);
-    }
-  };
-
-  // Load user's goals and progress (for reps)
-  useEffect(() => {
-    if (isRepView && user?.id) {
-      loadUserGoalsAndProgress();
-    } else {
-      setLoading(false);
-    }
-  }, [user?.id, currentWeek, isRepView]);
-
-  const loadUserGoalsAndProgress = async () => {
+  // Enhanced data loading functions with better error handling and caching prevention
+  const loadUserGoalsAndProgress = useCallback(async (forceReload = false) => {
+    if (!user?.id || !isRepView || dataFetchingRef?.current) return;
+    
+    dataFetchingRef.current = true;
     setLoading(true);
+    
     try {
-      // Load goals for current week
+      console.log(`Loading user goals for week: ${weekStartDate}, force reload: ${forceReload}`);
+      
+      // Force fresh data fetch from database with cache busting
+      const timestamp = Date.now();
       const goalsResult = await goalsService?.getWeeklyGoals(user?.id, weekStartDate);
-      if (goalsResult?.success) {
+      
+      if (goalsResult?.success && mountedRef?.current) {
         setUserGoals(goalsResult?.data || []);
+        console.log(`Fresh goals loaded: ${goalsResult?.data?.length} goals for user ${user?.id}`);
+        
+        // Update last refresh timestamp
+        setLastDataRefresh(timestamp);
+      } else if (mountedRef?.current) {
+        console.warn('Failed to load goals:', goalsResult?.error);
+        setUserGoals([]);
       }
 
       // Load goal statistics
@@ -173,20 +81,206 @@ const WeeklyGoals = () => {
         weekStartFrom: weekStartDate,
         weekStartTo: weekStartDate
       });
-      if (statsResult?.success) {
+      
+      if (statsResult?.success && mountedRef?.current) {
         setGoalStats(statsResult?.data);
       }
 
       // Calculate actual progress from activities
       await calculateActualProgress();
     } catch (error) {
-      console.error('Error loading goals:', error);
+      console.error('Error loading user goals:', error);
+      if (mountedRef?.current) {
+        setUserGoals([]);
+        setGoalStats(null);
+      }
     } finally {
-      setLoading(false);
+      if (mountedRef?.current) {
+        setLoading(false);
+      }
+      dataFetchingRef.current = false;
     }
-  };
+  }, [user?.id, weekStartDate, isRepView]);
 
-  const calculateActualProgress = async () => {
+  const loadTeamData = useCallback(async (forceReload = false) => {
+    if (!user?.id || isRepView || dataFetchingRef?.current) return;
+    
+    dataFetchingRef.current = true;
+    setRepsLoading(true);
+    
+    try {
+      console.log(`Loading team data for manager: ${user?.id}, force reload: ${forceReload}`);
+      
+      // Load all tenant users for manager view with cache busting
+      const teamMembers = await managerService?.getAllTenantUsers(user?.id);
+      
+      if (teamMembers?.length > 0 && mountedRef?.current) {
+        // Filter for active representatives and include manager
+        const activeReps = teamMembers?.filter(member => 
+          member?.is_active && (member?.role === 'rep' || member?.role === 'manager')
+        );
+        
+        // Transform to component format
+        const formattedReps = activeReps?.map(rep => ({
+          id: rep?.id,
+          name: rep?.full_name || 'Unknown Rep',
+          role: rep?.role === 'manager' ? 'Manager' : 'Sales Representative',
+          email: rep?.email || '',
+          total_accounts: rep?.total_accounts || 0,
+          recent_activities: rep?.recent_activities || 0
+        }));
+        
+        setRepresentatives(formattedReps);
+        console.log(`Team members loaded: ${formattedReps?.length} members`);
+        
+        // Load goals and performance data for each rep
+        await loadTeamGoalsAndPerformance(activeReps, forceReload);
+      } else if (mountedRef?.current) {
+        console.log('No team members found');
+        setRepresentatives([]);
+        setTeamGoals({});
+        setTeamPerformance({});
+        setPreviousWeekPerformance({});
+      }
+    } catch (error) {
+      console.error('Error loading team data:', error);
+      if (mountedRef?.current) {
+        setRepresentatives([]);
+        setTeamGoals({});
+        setTeamPerformance({});
+        setPreviousWeekPerformance({});
+      }
+    } finally {
+      if (mountedRef?.current) {
+        setRepsLoading(false);
+      }
+      dataFetchingRef.current = false;
+    }
+  }, [user?.id, isRepView, weekStartDate]);
+
+  const loadTeamGoalsAndPerformance = useCallback(async (teamMembers, forceReload = false) => {
+    if (!teamMembers?.length || !mountedRef?.current) return;
+    
+    try {
+      const currentWeekStart = weekStartDate;
+      const previousWeekStart = new Date(currentWeek);
+      previousWeekStart?.setDate(previousWeekStart?.getDate() - 7);
+      const previousWeekStartDate = previousWeekStart?.toISOString()?.split('T')?.[0];
+
+      const goalsData = {};
+      const performanceData = {};
+      const previousPerformanceData = {};
+
+      console.log(`Loading goals and performance for ${teamMembers?.length} team members`);
+
+      // Load goals and performance for each team member
+      for (const member of teamMembers) {
+        if (!mountedRef?.current) break;
+        
+        // Load current week goals with fresh data and cache busting
+        const goalsResult = await goalsService?.getWeeklyGoals(member?.id, currentWeekStart);
+        if (goalsResult?.success && goalsResult?.data?.length > 0) {
+          // Transform goals array to object keyed by goal_type
+          const memberGoals = {};
+          goalsResult?.data?.forEach(goal => {
+            memberGoals[goal?.goal_type] = {
+              target: goal?.target_value || 0,
+              current: goal?.current_value || 0,
+              status: goal?.status || 'Not Started'
+            };
+          });
+          goalsData[member?.id] = memberGoals;
+          console.log(`Loaded ${Object.keys(memberGoals)?.length} goals for member ${member?.full_name}`);
+        } else {
+          // Default goals structure if no goals found
+          goalsData[member?.id] = {
+            pop_ins: { target: 0, current: 0, status: 'Not Started' },
+            dm_conversations: { target: 0, current: 0, status: 'Not Started' },
+            assessments_booked: { target: 0, current: 0, status: 'Not Started' },
+            proposals_sent: { target: 0, current: 0, status: 'Not Started' },
+            wins: { target: 0, current: 0, status: 'Not Started' }
+          };
+        }
+
+        // Load current week performance from activities
+        const currentWeekEnd = new Date(currentWeek);
+        currentWeekEnd?.setDate(currentWeekEnd?.getDate() + 6);
+        
+        const activitiesResult = await activitiesService?.getActivitiesList({
+          userId: member?.id,
+          dateFrom: currentWeekStart,
+          dateTo: currentWeekEnd?.toISOString()?.split('T')?.[0]
+        });
+
+        if (activitiesResult?.success) {
+          const activities = activitiesResult?.data || [];
+          performanceData[member?.id] = {
+            pop_ins: activities?.filter(a => a?.activity_type === 'Site Visit')?.length || 0,
+            dm_conversations: activities?.filter(a => a?.activity_type === 'Phone Call')?.length || 0,
+            assessments_booked: activities?.filter(a => a?.activity_type === 'Assessment')?.length || 0,
+            proposals_sent: activities?.filter(a => a?.activity_type === 'Proposal Sent')?.length || 0,
+            wins: activities?.filter(a => a?.activity_type === 'Contract Signed')?.length || 0
+          };
+        } else {
+          performanceData[member?.id] = {
+            pop_ins: 0,
+            dm_conversations: 0,
+            assessments_booked: 0,
+            proposals_sent: 0,
+            wins: 0
+          };
+        }
+
+        // Load previous week performance from activities
+        const previousWeekEnd = new Date(previousWeekStart);
+        previousWeekEnd?.setDate(previousWeekEnd?.getDate() + 6);
+        
+        const previousActivitiesResult = await activitiesService?.getActivitiesList({
+          userId: member?.id,
+          dateFrom: previousWeekStartDate,
+          dateTo: previousWeekEnd?.toISOString()?.split('T')?.[0]
+        });
+
+        if (previousActivitiesResult?.success) {
+          const prevActivities = previousActivitiesResult?.data || [];
+          previousPerformanceData[member?.id] = {
+            pop_ins: prevActivities?.filter(a => a?.activity_type === 'Site Visit')?.length || 0,
+            dm_conversations: prevActivities?.filter(a => a?.activity_type === 'Phone Call')?.length || 0,
+            assessments_booked: prevActivities?.filter(a => a?.activity_type === 'Assessment')?.length || 0,
+            proposals_sent: prevActivities?.filter(a => a?.activity_type === 'Proposal Sent')?.length || 0,
+            wins: prevActivities?.filter(a => a?.activity_type === 'Contract Signed')?.length || 0
+          };
+        } else {
+          previousPerformanceData[member?.id] = {
+            pop_ins: 0,
+            dm_conversations: 0,
+            assessments_booked: 0,
+            proposals_sent: 0,
+            wins: 0
+          };
+        }
+      }
+
+      if (mountedRef?.current) {
+        setTeamGoals(goalsData);
+        setTeamPerformance(performanceData);
+        setPreviousWeekPerformance(previousPerformanceData);
+        setLastDataRefresh(Date.now());
+        console.log(`Team data loaded successfully for ${Object.keys(goalsData)?.length} members`);
+      }
+    } catch (error) {
+      console.error('Error loading team goals and performance:', error);
+      if (mountedRef?.current) {
+        setTeamGoals({});
+        setTeamPerformance({});
+        setPreviousWeekPerformance({});
+      }
+    }
+  }, [weekStartDate, currentWeek]);
+
+  const calculateActualProgress = useCallback(async () => {
+    if (!user?.id || !isRepView) return;
+    
     try {
       const weekEndDate = new Date(currentWeek);
       weekEndDate?.setDate(weekEndDate?.getDate() + 6);
@@ -197,7 +291,7 @@ const WeeklyGoals = () => {
         dateTo: weekEndDate?.toISOString()?.split('T')?.[0]
       });
 
-      if (activitiesResult?.success) {
+      if (activitiesResult?.success && mountedRef?.current) {
         const activities = activitiesResult?.data || [];
         
         // Calculate progress based on activities
@@ -216,46 +310,275 @@ const WeeklyGoals = () => {
     } catch (error) {
       console.error('Error calculating progress:', error);
     }
-  };
+  }, [user?.id, isRepView, currentWeek, weekStartDate]);
 
-  const handleGoalChange = (repId, newGoals) => {
-    setCurrentWeekGoals(prev => ({
-      ...prev,
-      [repId]: newGoals
-    }));
-  };
+  // Enhanced page visibility and focus handling
+  useEffect(() => {
+    mountedRef.current = true;
+    
+    const handleVisibilityChange = () => {
+      if (!document.hidden && mountedRef?.current) {
+        console.log('Page became visible, refreshing data...');
+        setForceRefresh(prev => prev + 1);
+      }
+    };
+    
+    const handleFocus = () => {
+      if (mountedRef?.current) {
+        console.log('Window focused, refreshing data...');
+        // Force a complete data refresh when window regains focus
+        setForceRefresh(prev => prev + 1);
+      }
+    };
 
-  const handleBulkGoalSet = (repIds, goals) => {
-    setCurrentWeekGoals(prev => {
-      const updated = { ...prev };
-      repIds?.forEach(repId => {
-        updated[repId] = { ...updated?.[repId], ...goals };
+    const handleBeforeUnload = () => {
+      mountedRef.current = false;
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      mountedRef.current = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  // Enhanced data loading effect with proper dependency management
+  useEffect(() => {
+    if (!user?.id || !userProfile?.role) return;
+    
+    const shouldForceReload = forceRefresh > 0;
+    console.log(`Data loading effect triggered. Rep view: ${isRepView}, Force reload: ${shouldForceReload}`);
+    
+    if (isRepView) {
+      loadUserGoalsAndProgress(shouldForceReload);
+    } else {
+      loadTeamData(shouldForceReload);
+    }
+  }, [user?.id, userProfile?.role, currentWeek, forceRefresh, isRepView, loadUserGoalsAndProgress, loadTeamData]);
+
+  // Enhanced goal change handler with better persistence and debugging
+  const handleGoalChange = useCallback(async (repId, newGoals) => {
+    if (!repId || !newGoals || Object.keys(newGoals)?.length === 0) return;
+    
+    try {
+      console.log(`Updating goals for rep ${repId}:`, newGoals);
+      
+      // Update goals in database using bulk set goals
+      const weekStart = weekStartDate;
+      
+      // Transform newGoals format to match what bulkSetGoals expects
+      const goalsData = {};
+      Object.keys(newGoals)?.forEach(type => {
+        if (newGoals?.[type] !== undefined && newGoals?.[type] !== null) {
+          goalsData[type] = parseInt(newGoals?.[type]) || 0;
+        }
       });
-      return updated;
+
+      const result = await goalsService?.bulkSetGoals([repId], weekStart, goalsData);
+      
+      if (result?.success) {
+        console.log('Goals saved successfully to database:', result?.message || 'Success');
+        
+        // Update local state immediately for better UX
+        setTeamGoals(prev => {
+          const updatedGoals = { ...prev };
+          
+          // Ensure rep object exists
+          if (!updatedGoals?.[repId]) {
+            updatedGoals[repId] = {};
+          }
+          
+          // Update with new goal values
+          Object.keys(goalsData)?.forEach(type => {
+            updatedGoals[repId] = {
+              ...updatedGoals?.[repId],
+              [type]: {
+                target: goalsData?.[type],
+                current: updatedGoals?.[repId]?.[type]?.current || 0,
+                status: goalsData?.[type] > 0 ? 'In Progress' : 'Not Started'
+              }
+            };
+          });
+          
+          return updatedGoals;
+        });
+
+        // Update last data refresh to prevent unnecessary reloads
+        setLastDataRefresh(Date.now());
+        
+        // Verify data persistence by forcing a refresh after a short delay
+        setTimeout(() => {
+          if (mountedRef?.current) {
+            console.log('Verifying goal persistence...');
+            setForceRefresh(prev => prev + 1);
+          }
+        }, 1000);
+        
+      } else {
+        console.error('Failed to update goals:', result?.error);
+        
+        // If there's a permission error, try to debug the relationship
+        if (result?.error?.includes('permission') || result?.error?.includes('manage') || result?.error?.includes('insufficient')) {
+          console.log('Permission error detected, debugging manager relationships...');
+          const debugResult = await goalsService?.debugManagerRelationships(user?.id);
+          if (debugResult?.success) {
+            console.log('Manager relationship debug:', debugResult?.data);
+          }
+        }
+        
+        // Show user-friendly error message
+        alert(`Failed to update goals: ${result?.error}\n\nIf this persists, please contact your system administrator to check manager-team relationships.`);
+      }
+    } catch (error) {
+      console.error('Error updating goals:', error);
+      alert('An unexpected error occurred while updating goals. Please try again or contact support.');
+    }
+  }, [weekStartDate, user?.id]);
+
+  const handleBulkGoalSet = useCallback(async (repIds, goals) => {
+    if (!repIds?.length || !goals || Object.keys(goals)?.length === 0) return;
+    
+    try {
+      console.log(`Bulk updating goals for ${repIds?.length} reps:`, goals);
+      
+      const weekStart = weekStartDate;
+      const result = await goalsService?.bulkSetGoals(repIds, weekStart, goals);
+      
+      if (result?.success) {
+        console.log('Bulk goals saved successfully to database:', result?.message || 'Success');
+        
+        // Update local state for all affected reps
+        setTeamGoals(prev => {
+          const updated = { ...prev };
+          repIds?.forEach(repId => {
+            if (!updated?.[repId]) {
+              updated[repId] = {};
+            }
+            
+            Object.keys(goals)?.forEach(type => {
+              updated[repId] = {
+                ...updated?.[repId],
+                [type]: {
+                  target: goals?.[type],
+                  current: updated?.[repId]?.[type]?.current || 0,
+                  status: goals?.[type] > 0 ? 'In Progress' : 'Not Started'
+                }
+              };
+            });
+          });
+          return updated;
+        });
+
+        // Update last data refresh
+        setLastDataRefresh(Date.now());
+        
+        // Verify data persistence
+        setTimeout(() => {
+          if (mountedRef?.current) {
+            console.log('Verifying bulk goal persistence...');
+            setForceRefresh(prev => prev + 1);
+          }
+        }, 1000);
+        
+      } else {
+        console.error('Failed to bulk update goals:', result?.error);
+        
+        // If there's a permission error, try to debug and possibly fix relationships
+        if (result?.error?.includes('permission') || result?.error?.includes('manage') || result?.error?.includes('insufficient')) {
+          console.log('Permission error detected, trying to establish manager relationships...');
+          const establishResult = await goalsService?.establishManagerRelationships();
+          if (establishResult?.success && establishResult?.count > 0) {
+            console.log(`Established ${establishResult?.count} manager relationships. Retrying goal assignment...`);
+            // Retry the operation once
+            setTimeout(() => {
+              if (mountedRef?.current) {
+                handleBulkGoalSet(repIds, goals);
+              }
+            }, 1000);
+            return;
+          }
+        }
+        
+        alert(`Failed to bulk update goals: ${result?.error}\n\nIf this persists, please contact your system administrator to check manager-team relationships.`);
+      }
+    } catch (error) {
+      console.error('Error bulk updating goals:', error);
+      alert('An unexpected error occurred while bulk updating goals. Please try again or contact support.');
+    }
+  }, [weekStartDate]);
+
+  const handleCopyFromPreviousWeek = useCallback(() => {
+    // Copy previous week's performance as goals for current week
+    const repIds = representatives?.map(rep => rep?.id);
+    const previousGoals = {};
+    
+    // Transform previous week performance to goals format
+    Object.keys(previousWeekPerformance)?.forEach(repId => {
+      const prevPerf = previousWeekPerformance?.[repId];
+      if (prevPerf) {
+        previousGoals.pop_ins = prevPerf?.pop_ins || 0;
+        previousGoals.dm_conversations = prevPerf?.dm_conversations || 0;
+        previousGoals.assessments_booked = prevPerf?.assessments_booked || 0;
+        previousGoals.proposals_sent = prevPerf?.proposals_sent || 0;
+        previousGoals.wins = prevPerf?.wins || 0;
+      }
     });
-  };
 
-  const handleCopyFromPreviousWeek = () => {
-    setCurrentWeekGoals(previousWeekPerformance);
-  };
+    if (Object.keys(previousGoals)?.length > 0) {
+      handleBulkGoalSet(repIds, previousGoals);
+    }
+  }, [representatives, previousWeekPerformance, handleBulkGoalSet]);
 
-  const handleWeekChange = (newWeek) => {
+  const handleWeekChange = useCallback((newWeek) => {
+    console.log('Week changed, triggering data refresh...');
     setCurrentWeek(newWeek);
-  };
+    // Force a complete refresh when week changes
+    setForceRefresh(prev => prev + 1);
+  }, []);
 
-  const toggleSidebar = () => {
+  // Manual refresh function
+  const handleManualRefresh = useCallback(async () => {
+    console.log('Manual refresh triggered');
+    setForceRefresh(prev => prev + 1);
+  }, []);
+
+  // Utility functions
+  const toggleSidebar = useCallback(() => {
     setSidebarCollapsed(!sidebarCollapsed);
-  };
+  }, [sidebarCollapsed]);
 
-  const toggleMobileMenu = () => {
+  const toggleMobileMenu = useCallback(() => {
     setMobileMenuOpen(!mobileMenuOpen);
-  };
+  }, [mobileMenuOpen]);
 
-  // Update loading state to include reps loading
+  // Memoized goal conversion functions
+  const getCurrentWeekGoals = useCallback(() => {
+    const converted = {};
+    Object.keys(teamGoals)?.forEach(repId => {
+      converted[repId] = {};
+      const repGoals = teamGoals?.[repId] || {};
+      Object.keys(repGoals)?.forEach(goalType => {
+        converted[repId][goalType] = repGoals?.[goalType]?.target || 0;
+      });
+    });
+    return converted;
+  }, [teamGoals]);
+
+  const getCurrentWeekPerformance = useCallback(() => {
+    return teamPerformance;
+  }, [teamPerformance]);
+
+  // Memoized values to prevent unnecessary re-renders
+  const currentWeekGoals = getCurrentWeekGoals();
   const isManagerLoading = !isRepView && repsLoading;
   const isRepLoading = isRepView && loading;
 
-  // Show individual rep view
+  // Show individual rep view with enhanced persistence
   if (isRepView) {
     return (
       <div className="min-h-screen bg-background">
@@ -300,14 +623,14 @@ const WeeklyGoals = () => {
             goalStats={goalStats}
             actualProgress={actualProgress}
             loading={loading}
-            onRefresh={loadUserGoalsAndProgress}
+            onRefresh={handleManualRefresh}
           />
         </div>
       </div>
     );
   }
 
-  // Show manager view with loading state
+  // Show manager view with enhanced persistence
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop Sidebar */}
@@ -343,13 +666,16 @@ const WeeklyGoals = () => {
         sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
       } pt-16 lg:pt-0`}>
         <div className="p-6 space-y-6">
-          {/* Header Section */}
+          {/* Header Section with Data Status */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
             <div>
               <h1 className="text-2xl font-bold text-foreground">Team Weekly Goals</h1>
               <p className="text-muted-foreground">
                 Set and manage performance targets for your sales team
               </p>
+              <div className="text-xs text-muted-foreground mt-1">
+                Last updated: {new Date(lastDataRefresh)?.toLocaleTimeString()}
+              </div>
             </div>
             
             <div className="flex items-center space-x-3">
@@ -361,6 +687,16 @@ const WeeklyGoals = () => {
                 iconPosition="left"
               >
                 View Dashboard
+              </Button>
+              <Button
+                variant="outline" 
+                size="sm"
+                onClick={handleManualRefresh}
+                iconName="RefreshCw"
+                iconPosition="left"
+                disabled={isManagerLoading}
+              >
+                {isManagerLoading ? 'Refreshing...' : 'Refresh'}
               </Button>
               <Button
                 variant="secondary"
@@ -377,7 +713,7 @@ const WeeklyGoals = () => {
           {isManagerLoading && (
             <div className="text-center py-8">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              <p className="mt-2 text-muted-foreground">Loading team representatives...</p>
+              <p className="mt-2 text-muted-foreground">Loading team data...</p>
             </div>
           )}
 
@@ -390,13 +726,13 @@ const WeeklyGoals = () => {
                 onWeekChange={handleWeekChange}
               />
 
-              {/* No Reps Message */}
+              {/* No Team Members Message */}
               {representatives?.length === 0 && (
                 <div className="text-center py-12 bg-card border border-border rounded-lg">
                   <Icon name="Users" size={48} className="mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium text-foreground mb-2">No Team Representatives Found</h3>
+                  <h3 className="text-lg font-medium text-foreground mb-2">No Team Members Found</h3>
                   <p className="text-muted-foreground mb-4">
-                    There are no sales representatives in your team yet.
+                    There are no active team members in your tenant. Team members will appear here once they're added to your organization.
                   </p>
                   <Button
                     variant="outline"
@@ -404,7 +740,7 @@ const WeeklyGoals = () => {
                     iconName="UserPlus"
                     iconPosition="left"
                   >
-                    Add Team Members
+                    Manage Users
                   </Button>
                 </div>
               )}
@@ -416,7 +752,7 @@ const WeeklyGoals = () => {
                   <GoalProgressSummary
                     representatives={representatives}
                     currentWeekGoals={currentWeekGoals}
-                    currentWeekPerformance={currentWeekPerformance}
+                    currentWeekPerformance={getCurrentWeekPerformance()}
                   />
 
                   {/* Bulk Actions */}
@@ -433,10 +769,10 @@ const WeeklyGoals = () => {
                     <div className="space-y-3">
                       {representatives?.map((rep) => (
                         <RepGoalRow
-                          key={rep?.id}
+                          key={`${rep?.id}-${lastDataRefresh}`}
                           rep={rep}
                           goals={currentWeekGoals?.[rep?.id] || {}}
-                          previousWeekPerformance={previousWeekPerformance?.[rep?.id]}
+                          previousWeekPerformance={previousWeekPerformance?.[rep?.id] || {}}
                           onGoalChange={handleGoalChange}
                         />
                       ))}
@@ -452,22 +788,22 @@ const WeeklyGoals = () => {
                     
                     {representatives?.map((rep) => (
                       <MobileGoalCard
-                        key={rep?.id}
+                        key={`${rep?.id}-${lastDataRefresh}`}
                         rep={rep}
                         goals={currentWeekGoals?.[rep?.id] || {}}
-                        previousWeekPerformance={previousWeekPerformance?.[rep?.id]}
+                        previousWeekPerformance={previousWeekPerformance?.[rep?.id] || {}}
                         onGoalChange={handleGoalChange}
                       />
                     ))}
                   </div>
 
-                  {/* Action Summary */}
+                  {/* Enhanced Status Summary */}
                   <div className="bg-card border border-border rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         <Icon name="CheckCircle" size={20} className="text-success" />
                         <span className="font-medium text-foreground">
-                          Goals updated for {representatives?.length} rep{representatives?.length !== 1 ? 's' : ''} - Week of {currentWeek?.toLocaleDateString('en-US', { 
+                          Managing goals for {representatives?.length} team member{representatives?.length !== 1 ? 's' : ''} - Week of {currentWeek?.toLocaleDateString('en-US', { 
                             month: 'long', 
                             day: 'numeric',
                             year: 'numeric'
@@ -475,9 +811,15 @@ const WeeklyGoals = () => {
                         </span>
                       </div>
                       
-                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                        <Icon name="Clock" size={16} />
-                        <span>Last updated: {new Date()?.toLocaleTimeString()}</span>
+                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                        <div className="flex items-center space-x-1">
+                          <div className={`w-2 h-2 rounded-full ${dataFetchingRef?.current ? 'bg-yellow-400' : 'bg-green-400'}`}></div>
+                          <span>{dataFetchingRef?.current ? 'Syncing...' : 'Synced'}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Icon name="Clock" size={16} />
+                          <span>{new Date(lastDataRefresh)?.toLocaleTimeString()}</span>
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -4,16 +4,21 @@ import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import { Checkbox } from '../../../components/ui/Checkbox';
 
-const AccountsTable = ({ 
+
+export function AccountsTable({ 
   accounts, 
+  onView, 
+  onEdit, 
+  onAssignReps, 
   selectedAccounts, 
   onSelectAccount, 
   onSelectAll, 
-  sortConfig, 
+  currentUser,
+  sortConfig,
   onSort,
   currentPage,
-  itemsPerPage 
-}) => {
+  itemsPerPage
+}) {
   const navigate = useNavigate();
   const [hoveredRow, setHoveredRow] = useState(null);
 
@@ -56,11 +61,10 @@ const AccountsTable = ({
     const stageColors = {
       'Prospect': 'bg-slate-100 text-slate-700',
       'Contacted': 'bg-blue-100 text-blue-700',
-      'Qualified': 'bg-yellow-100 text-yellow-700',
-      'Assessment Scheduled': 'bg-orange-100 text-orange-700',
-      'Proposal Sent': 'bg-purple-100 text-purple-700',
-      'Won': 'bg-green-100 text-green-700',
-      'Lost': 'bg-red-100 text-red-700'
+      'Vendor Packet Request': 'bg-yellow-100 text-yellow-700',
+      'Vendor Packet Submitted': 'bg-orange-100 text-orange-700',
+      'Approved for Work': 'bg-purple-100 text-purple-700',
+      'Actively Engaged': 'bg-green-100 text-green-700'
     };
     return stageColors?.[stage] || 'bg-gray-100 text-gray-700';
   };
@@ -76,6 +80,8 @@ const AccountsTable = ({
 
   const isAllSelected = selectedAccounts?.length === accounts?.length && accounts?.length > 0;
   const isIndeterminate = selectedAccounts?.length > 0 && selectedAccounts?.length < accounts?.length;
+  const isManager = currentUser?.role === 'manager';
+  const canManageAssignments = isManager || currentUser?.role === 'admin';
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
@@ -274,6 +280,4 @@ const AccountsTable = ({
       )}
     </div>
   );
-};
-
-export default AccountsTable;
+}

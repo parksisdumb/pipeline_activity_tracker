@@ -13,6 +13,7 @@ const Checkbox = React.forwardRef(({
     description,
     error,
     size = "default",
+    onChange,
     ...props
 }, ref) => {
     // Generate unique ID if not provided
@@ -25,9 +26,35 @@ const Checkbox = React.forwardRef(({
         lg: "h-5 w-5"
     };
 
+    // Handle checkbox change
+    const handleChange = (e) => {
+        if (onChange) {
+            onChange(e);
+        }
+    };
+
+    // Handle label click to ensure checkbox is toggled
+    const handleLabelClick = (e) => {
+        if (disabled) return;
+        
+        // Create synthetic event to maintain consistency
+        const syntheticEvent = {
+            target: {
+                checked: !checked,
+                value: !checked
+            },
+            preventDefault: () => e?.preventDefault(),
+            stopPropagation: () => e?.stopPropagation()
+        };
+        
+        if (onChange) {
+            onChange(syntheticEvent);
+        }
+    };
+
     return (
         <div className={cn("flex items-start space-x-2", className)}>
-            <div className="relative flex items-center">
+            <div className="relative">
                 <input
                     type="checkbox"
                     ref={ref}
@@ -35,37 +62,58 @@ const Checkbox = React.forwardRef(({
                     checked={checked}
                     disabled={disabled}
                     required={required}
+                    onChange={handleChange}
                     className="sr-only"
                     {...props}
                 />
 
-                <label
-                    htmlFor={checkboxId}
+                <div
+                    role="checkbox"
+                    aria-checked={indeterminate ? "mixed" : checked}
+                    aria-labelledby={label ? `${checkboxId}-label` : undefined}
+                    tabIndex={disabled ? -1 : 0}
+                    onClick={handleLabelClick}
+                    onKeyDown={(e) => {
+                        if (e?.key === ' ' || e?.key === 'Enter') {
+                            e?.preventDefault();
+                            handleLabelClick(e);
+                        }
+                    }}
                     className={cn(
-                        "peer shrink-0 rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground cursor-pointer transition-colors",
+                        "shrink-0 rounded-sm border border-black ring-offset-background transition-colors duration-200",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                        "cursor-pointer flex items-center justify-center",
+                        "hover:border-primary hover:bg-primary/5",
                         sizeClasses?.[size],
-                        checked && "bg-primary text-primary-foreground border-primary",
-                        indeterminate && "bg-primary text-primary-foreground border-primary",
-                        error && "border-destructive",
-                        disabled && "cursor-not-allowed opacity-50"
+                        checked && "bg-primary border-primary text-primary-foreground hover:bg-primary/90",
+                        indeterminate && "bg-primary border-primary text-primary-foreground hover:bg-primary/90",
+                        error && "border-destructive hover:border-destructive",
+                        disabled && "cursor-not-allowed opacity-50 hover:border-input hover:bg-transparent"
                     )}
                 >
                     {checked && !indeterminate && (
-                        <Check className="h-3 w-3 text-current flex items-center justify-center" />
+                        <Check className="h-3 w-3 text-current" />
                     )}
                     {indeterminate && (
-                        <Minus className="h-3 w-3 text-current flex items-center justify-center" />
+                        <Minus className="h-3 w-3 text-current" />
                     )}
-                </label>
+                </div>
             </div>
             {(label || description || error) && (
                 <div className="flex-1 space-y-1">
                     {label && (
                         <label
+                            id={`${checkboxId}-label`}
                             htmlFor={checkboxId}
+                            onClick={(e) => {
+                                e?.preventDefault();
+                                handleLabelClick(e);
+                            }}
                             className={cn(
-                                "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer",
-                                error ? "text-destructive" : "text-foreground"
+                                "text-sm font-medium leading-none cursor-pointer",
+                                "hover:text-primary transition-colors",
+                                error ? "text-destructive" : "text-foreground",
+                                disabled && "cursor-not-allowed opacity-70"
                             )}
                         >
                             {label}

@@ -8,6 +8,8 @@ import ActivitiesTab from './components/ActivitiesTab';
 import ProfileEditor from './components/ProfileEditor';
 import QuickActions from './components/QuickActions';
 import RelationshipMap from './components/RelationshipMap';
+
+import PropertiesModal from '../../components/ui/PropertiesModal';
 import { contactsService } from '../../services/contactsService';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
@@ -22,6 +24,7 @@ const ContactDetails = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [activities, setActivities] = useState([]);
   const [relatedContacts, setRelatedContacts] = useState([]);
+  const [showPropertiesModal, setShowPropertiesModal] = useState(false);
 
   // Enhanced parameter validation with better error handling
   useEffect(() => {
@@ -183,10 +186,21 @@ const ContactDetails = () => {
   const handleActivityLog = (activityData) => {
     navigate('/log-activity', { 
       state: { 
+        preselected: true,
         contactId: contact?.id,
         contactName: contact?.name,
         accountId: contact?.accountId,
-        accountName: contact?.account
+        accountName: contact?.account,
+        contact: {
+          value: contact?.id,
+          label: contact?.name,
+          description: `${contact?.title || 'Contact'} at ${contact?.account}`
+        },
+        account: {
+          value: contact?.accountId,
+          label: contact?.account,
+          description: 'Account'
+        }
       }
     });
   };
@@ -205,9 +219,9 @@ const ContactDetails = () => {
     }
   };
 
-  const handleNavigateToProperty = () => {
-    if (contact?.propertyId) {
-      navigate(`/properties-list?highlight=${contact?.propertyId}`);
+  const handleNavigateToProperty = (propertyId) => {
+    if (propertyId) {
+      navigate(`/property-details/${propertyId}`);
     }
   };
 
@@ -358,6 +372,13 @@ const ContactDetails = () => {
                     >
                       Relationships ({relatedContacts?.length || 0})
                     </button>
+                    <button
+                      onClick={() => setShowPropertiesModal(true)}
+                      className="text-sm font-medium pb-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Icon name="Building2" size={16} className="mr-1 inline" />
+                      Properties
+                    </button>
                   </div>
                 </div>
 
@@ -392,6 +413,14 @@ const ContactDetails = () => {
           onCancel={() => setIsEditingProfile(false)}
         />
       )}
+
+      {/* Properties Modal */}
+      <PropertiesModal
+        isOpen={showPropertiesModal}
+        onClose={() => setShowPropertiesModal(false)}
+        contact={contact}
+        onNavigateToProperty={handleNavigateToProperty}
+      />
     </div>
   );
 };

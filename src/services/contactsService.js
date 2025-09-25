@@ -459,5 +459,39 @@ export const contactsService = {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to set reminder' };
     }
+  },
+
+  // Get linked properties for a contact
+  async getLinkedProperties(contactId) {
+    if (!contactId) return { success: false, error: 'Contact ID is required' };
+
+    // Validate that contactId is a proper UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex?.test(contactId)) {
+      console.error('Invalid contact ID format:', contactId);
+      return { success: false, error: 'Invalid contact ID format. Expected UUID.' };
+    }
+
+    try {
+      console.log('Getting linked properties for contact:', contactId);
+      
+      const { data, error } = await supabase
+        ?.rpc('get_contact_linked_properties', { contact_uuid: contactId });
+
+      if (error) {
+        console.error('Get linked properties error:', error);
+        return { success: false, error: error?.message || 'Failed to load linked properties' };
+      }
+
+      console.log('Linked properties data from database:', data);
+
+      // Ensure we return an array even if data is null/undefined
+      const properties = data || [];
+      
+      return { success: true, data: properties };
+    } catch (error) {
+      console.error('Service error:', error);
+      return { success: false, error: 'Failed to load linked properties' };
+    }
   }
 };

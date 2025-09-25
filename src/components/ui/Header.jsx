@@ -14,9 +14,9 @@ const Header = ({ userRole = 'rep', onMenuToggle, isMenuOpen = false }) => {
 
   const navigationItems = [
     { label: 'Today', path: '/today', icon: 'Home', roles: ['rep', 'manager'] },
-    { label: 'Accounts', path: '/accounts-list', icon: 'Building2', roles: ['rep', 'manager'] },
-    { label: 'Properties', path: '/properties-list', icon: 'MapPin', roles: ['rep', 'manager'] },
-    { label: 'Contacts', path: '/contacts-list', icon: 'Users', roles: ['rep', 'manager'] },
+    { label: 'Accounts', path: '/accounts', icon: 'Building2', roles: ['rep', 'manager'] },
+    { label: 'Properties', path: '/properties', icon: 'MapPin', roles: ['rep', 'manager'] },
+    { label: 'Contacts', path: '/contacts', icon: 'Users', roles: ['rep', 'manager'] },
     { label: 'Activities', path: '/activities', icon: 'Activity', roles: ['rep', 'manager'] },
     { label: 'Dashboard', path: '/manager-dashboard', icon: 'BarChart3', roles: ['manager'] },
   ];

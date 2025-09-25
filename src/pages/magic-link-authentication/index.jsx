@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { CheckCircle, AlertCircle, Loader2, Mail, ArrowRight, RefreshCw } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, Mail, ArrowRight, RefreshCw, Shield } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { authService } from '../../services/authService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MagicLinkAuthentication = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const { sendPasswordReset } = useAuth();
   
   const [authState, setAuthState] = useState({
     loading: true,
@@ -15,7 +16,9 @@ const MagicLinkAuthentication = () => {
     error: null,
     message: '',
     userEmail: '',
-    needsPasswordSetup: false
+    needsPasswordSetup: false,
+    profileIncomplete: false,
+    redirectUrl: '/today'
   });
 
   const [resending, setResending] = useState(false);
@@ -35,6 +38,7 @@ const MagicLinkAuthentication = () => {
       const type = searchParams?.get('type');
       const error = searchParams?.get('error');
       const errorDescription = searchParams?.get('error_description');
+      const emailFromParams = searchParams?.get('email');
 
       // Check for errors first
       if (error) {
@@ -58,30 +62,29 @@ const MagicLinkAuthentication = () => {
           success: true,
           error: null,
           message: 'Password reset link verified! Redirecting to set new password...',
-          userEmail: searchParams?.get('email') || '',
-          needsPasswordSetup: false
+          userEmail: emailFromParams || '',
+          needsPasswordSetup: true,
+          profileIncomplete: false,
+          redirectUrl: '/password-setup'
         });
 
-        // Redirect to password reset confirmation with proper URL params
+        // Redirect to password setup for recovery
         setTimeout(() => {
-          const params = new URLSearchParams({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-            type: 'recovery'
+          navigate('/password-setup', { 
+            state: { 
+              needsPasswordSetup: true,
+              email: emailFromParams || '',
+              isRecovery: true,
+              message: 'Please set your new password.'
+            },
+            replace: true
           });
-          
-          const email = searchParams?.get('email');
-          if (email) {
-            params?.set('email', email);
-          }
-          
-          navigate(`/password-reset-confirmation?${params?.toString()}`);
         }, 2000);
         return;
       }
 
-      // Check if this is a magic link authentication
-      if (type === 'magiclink' && accessToken && refreshToken) {
+      // Check if this is a magic link authentication or email confirmation
+      if ((type === 'magiclink' || type === 'signup' || type === 'confirmation') && accessToken && refreshToken) {
         // Set the session using the tokens
         const { data: sessionData, error: sessionError } = await supabase?.auth?.setSession({
           access_token: accessToken,
@@ -93,63 +96,99 @@ const MagicLinkAuthentication = () => {
         }
 
         if (sessionData?.user) {
-          // Get user profile to determine next steps
-          const { data: profile, error: profileError } = await supabase?.from('user_profiles')?.select('*')?.eq('id', sessionData?.user?.id)?.single();
-
-          setAuthState({
-            loading: false,
-            success: true,
-            error: null,
-            message: 'Successfully authenticated! Redirecting to dashboard...',
-            userEmail: sessionData?.user?.email,
-            needsPasswordSetup: false
-          });
-
-          // Redirect based on user role
-          setTimeout(() => {
-            const userRole = profile?.role || 'rep';
-            switch (userRole) {
-              case 'super_admin': navigate('/super-admin-dashboard');
-                break;
-              case 'admin': navigate('/admin-dashboard');
-                break;
-              case 'manager': navigate('/manager-dashboard');
-                break;
-              default:
-                navigate('/today');
+          // Enhanced email confirmation with better redirect logic
+          const { data: workflowResult, error: workflowError } = await supabase?.rpc(
+            'handle_email_confirmation_workflow',
+            { 
+              user_id: sessionData?.user?.id,
+              user_email: sessionData?.user?.email 
             }
-          }, 2000);
+          );
+
+          if (workflowError) {
+            console.warn('Workflow error:', workflowError);
+            // Fallback to basic logic if function fails
+            await handleBasicAuthFlow(sessionData?.user);
+            return;
+          }
+
+          const result = workflowResult?.[0];
+          if (result?.success) {
+            const nextStep = result?.next_step;
+            const needsPasswordSetup = result?.needs_password_setup || false;
+            const needsProfileCompletion = result?.needs_profile_completion || false;
+
+            setAuthState({
+              loading: false,
+              success: true,
+              error: null,
+              message: result?.message || 'Authentication successful!',
+              userEmail: sessionData?.user?.email,
+              needsPasswordSetup,
+              profileIncomplete: needsProfileCompletion,
+              redirectUrl: getRedirectUrl(nextStep)
+            });
+
+            // Enhanced redirect logic with proper parameter passing
+            setTimeout(() => {
+              if (nextStep === 'setup-password' || nextStep === 'complete-profile') {
+                navigate('/password-setup', { 
+                  state: { 
+                    needsPasswordSetup,
+                    profileIncomplete: needsProfileCompletion,
+                    email: sessionData?.user?.email,
+                    confirmed: true,
+                    message: result?.message,
+                    // Check if user has temp password metadata
+                    tempPasswordProvided: sessionData?.user?.user_metadata?.temp_password_provided || false
+                  },
+                  replace: true
+                });
+              } else if (nextStep === 'dashboard') {
+                // Get user profile to determine correct dashboard
+                supabase?.from('user_profiles')?.select('role')?.eq('id', sessionData?.user?.id)?.single()
+                  ?.then(({ data: profile }) => {
+                    const dashboardUrl = getDashboardUrl(profile?.role);
+                    navigate(dashboardUrl, { replace: true });
+                  })
+                  ?.catch(() => {
+                    navigate('/today', { replace: true });
+                  });
+              } else {
+                navigate(getRedirectUrl(nextStep), { replace: true });
+              }
+            }, 2000);
+          } else {
+            throw new Error(result?.message || 'Email confirmation workflow failed');
+          }
           return;
         }
       }
 
-      // Check if this is an email confirmation
-      if (type === 'signup' || type === 'confirmation') {
-        const { data: { user }, error: userError } = await supabase?.auth?.getUser();
-        
-        if (userError || !user) {
-          throw new Error('Unable to confirm email. Please try again.');
-        }
-
+      // Check if this might be a temporary password setup flow
+      if (emailFromParams) {
+        // User clicked email but might need temporary password setup
         setAuthState({
           loading: false,
           success: true,
           error: null,
-          message: 'Email confirmed successfully! You can now set up your password.',
-          userEmail: user?.email,
-          needsPasswordSetup: true
+          message: 'Email confirmed! You can also use your temporary password if you have one.',
+          userEmail: emailFromParams,
+          needsPasswordSetup: true,
+          profileIncomplete: true,
+          redirectUrl: '/temporary-password-setup'
         });
 
-        // Redirect to password setup
         setTimeout(() => {
-          navigate('/password-setup', { 
+          navigate('/temporary-password-setup', { 
             state: { 
-              email: user?.email,
-              confirmed: true,
-              message: 'Email confirmed! Please set up your password to complete registration.'
-            }
+              email: emailFromParams,
+              fromEmailConfirmation: true,
+              message: 'You can use your temporary password to complete account setup.'
+            },
+            replace: true
           });
-        }, 2000);
+        }, 3000);
         return;
       }
 
@@ -158,9 +197,11 @@ const MagicLinkAuthentication = () => {
         loading: false,
         success: false,
         error: 'Invalid or expired authentication link',
-        message: 'This link may have expired or is invalid. Please request a new one.',
-        userEmail: '',
-        needsPasswordSetup: false
+        message: 'This link may have expired or is invalid. Please request a new one or use your temporary password.',
+        userEmail: emailFromParams || '',
+        needsPasswordSetup: false,
+        profileIncomplete: false,
+        redirectUrl: '/login'
       });
 
     } catch (error) {
@@ -169,10 +210,114 @@ const MagicLinkAuthentication = () => {
         loading: false,
         success: false,
         error: error?.message || 'Authentication failed',
-        message: 'There was a problem with the authentication link. Please try again.',
+        message: 'There was a problem with the authentication link. You can try using your temporary password instead.',
         userEmail: '',
-        needsPasswordSetup: false
+        needsPasswordSetup: false,
+        profileIncomplete: false,
+        redirectUrl: '/login'
       });
+    }
+  };
+
+  // Fallback authentication flow if enhanced workflow fails
+  const handleBasicAuthFlow = async (user) => {
+    try {
+      // Get user profile to check password and profile status
+      const { data: profile, error: profileError } = await supabase
+        ?.from('user_profiles')
+        ?.select('*')
+        ?.eq('id', user?.id)
+        ?.single();
+
+      if (profileError && profileError?.code !== 'PGRST116') {
+        throw profileError;
+      }
+
+      // Determine if user needs password setup or profile completion
+      const needsPasswordSetup = !profile?.password_set;
+      const profileIncomplete = !profile?.profile_completed || !profile?.full_name;
+
+      if (needsPasswordSetup || profileIncomplete) {
+        setAuthState({
+          loading: false,
+          success: true,
+          error: null,
+          message: needsPasswordSetup 
+            ? 'Authentication successful! Please set up your password to complete registration.'
+            : 'Authentication successful! Please complete your profile setup.',
+          userEmail: user?.email,
+          needsPasswordSetup,
+          profileIncomplete,
+          redirectUrl: '/password-setup'
+        });
+
+        // Redirect to password setup page with proper state
+        setTimeout(() => {
+          navigate('/password-setup', { 
+            state: { 
+              needsPasswordSetup,
+              profileIncomplete,
+              email: user?.email,
+              confirmed: true,
+              message: needsPasswordSetup 
+                ? 'Please set up your password to complete registration.'
+                : 'Please complete your profile setup.'
+            },
+            replace: true
+          });
+        }, 2000);
+        return;
+      }
+
+      // User has complete setup - redirect to dashboard
+      const redirectUrl = getDashboardUrl(profile?.role);
+      setAuthState({
+        loading: false,
+        success: true,
+        error: null,
+        message: 'Successfully authenticated! Redirecting to your dashboard...',
+        userEmail: user?.email,
+        needsPasswordSetup: false,
+        profileIncomplete: false,
+        redirectUrl
+      });
+
+      setTimeout(() => {
+        navigate(redirectUrl, { replace: true });
+      }, 2000);
+
+    } catch (error) {
+      throw new Error(`Profile validation failed: ${error.message}`);
+    }
+  };
+
+  const getRedirectUrl = (nextStep) => {
+    switch (nextStep) {
+      case 'setup-password': case'complete-profile':
+        return '/password-setup';
+      case 'dashboard':
+        return '/today'; // Default dashboard
+      case 'super-admin-dashboard':
+        return '/super-admin-dashboard';
+      case 'admin-dashboard': 
+        return '/admin-dashboard';
+      case 'manager-dashboard':
+        return '/manager-dashboard';
+      default:
+        return '/today';
+    }
+  };
+
+  const getDashboardUrl = (userRole) => {
+    switch (userRole) {
+      case 'super_admin': 
+        return '/super-admin-dashboard';
+      case 'admin': 
+        return '/admin-dashboard';
+      case 'manager': 
+        return '/manager-dashboard';
+      default:
+        return '/today';
     }
   };
 
@@ -181,24 +326,24 @@ const MagicLinkAuthentication = () => {
 
     setResending(true);
     try {
-      const result = await authService?.sendMagicLink(authState?.userEmail);
+      const result = await sendPasswordReset(authState?.userEmail);
       
       if (result?.success) {
         setAuthState(prev => ({
           ...prev,
-          message: 'New magic link sent! Please check your email.',
+          message: 'New authentication link sent! Please check your email.',
           error: null
         }));
       } else {
         setAuthState(prev => ({
           ...prev,
-          error: result?.error || 'Failed to send magic link'
+          error: result?.error || 'Failed to send authentication link'
         }));
       }
     } catch (error) {
       setAuthState(prev => ({
         ...prev,
-        error: 'Failed to send magic link. Please try again.'
+        error: 'Failed to send authentication link. Please try again.'
       }));
     } finally {
       setResending(false);
@@ -207,6 +352,20 @@ const MagicLinkAuthentication = () => {
 
   const handleReturnToLogin = () => {
     navigate('/login');
+  };
+
+  const handleManualPasswordSetup = () => {
+    if (authState?.userEmail) {
+      navigate('/password-setup', { 
+        state: { 
+          needsPasswordSetup: authState?.needsPasswordSetup,
+          profileIncomplete: authState?.profileIncomplete,
+          email: authState?.userEmail,
+          confirmed: true,
+          message: 'Complete your account setup.'
+        }
+      });
+    }
   };
 
   return (
@@ -271,15 +430,17 @@ const MagicLinkAuthentication = () => {
           {/* Success Actions */}
           {!authState?.loading && authState?.success && (
             <div className="space-y-3">
-              {authState?.needsPasswordSetup && (
+              {(authState?.needsPasswordSetup || authState?.profileIncomplete) && (
                 <div className="p-3 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-700">
-                    You'll be redirected to set up your password...
+                    {authState?.needsPasswordSetup 
+                      ? 'You\'ll be redirected to set up your password...' :'You\'ll be redirected to complete your profile...'
+                    }
                   </p>
                 </div>
               )}
               
-              {!authState?.needsPasswordSetup && (
+              {!authState?.needsPasswordSetup && !authState?.profileIncomplete && (
                 <div className="p-3 bg-green-50 rounded-lg">
                   <p className="text-sm text-green-700">
                     Redirecting to your dashboard...
@@ -287,17 +448,27 @@ const MagicLinkAuthentication = () => {
                 </div>
               )}
               
-              <button
-                onClick={() => navigate('/today')}
-                className="inline-flex items-center justify-center w-full px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Continue to Dashboard
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </button>
+              {(authState?.needsPasswordSetup || authState?.profileIncomplete) ? (
+                <button
+                  onClick={handleManualPasswordSetup}
+                  className="inline-flex items-center justify-center w-full px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Continue to Setup
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate(authState?.redirectUrl)}
+                  className="inline-flex items-center justify-center w-full px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Continue to Dashboard
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </button>
+              )}
             </div>
           )}
 
-          {/* Error Actions */}
+          {/* Enhanced Error Actions with temporary password option */}
           {!authState?.loading && authState?.error && (
             <div className="space-y-4">
               <div className="p-3 bg-red-50 rounded-lg">
@@ -306,23 +477,33 @@ const MagicLinkAuthentication = () => {
               
               <div className="space-y-2">
                 {authState?.userEmail && (
-                  <button
-                    onClick={handleResendMagicLink}
-                    disabled={resending}
-                    className="inline-flex items-center justify-center w-full px-4 py-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {resending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Send New Magic Link
-                      </>
-                    )}
-                  </button>
+                  <>
+                    <button
+                      onClick={handleResendMagicLink}
+                      disabled={resending}
+                      className="inline-flex items-center justify-center w-full px-4 py-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {resending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Send New Authentication Link
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => navigate(`/temporary-password-setup?email=${encodeURIComponent(authState?.userEmail)}`)}
+                      className="inline-flex items-center justify-center w-full px-4 py-2 text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      Use Temporary Password Instead
+                    </button>
+                  </>
                 )}
                 
                 <button

@@ -859,62 +859,71 @@ export const adminService = {
         return { success: false, error: sessionCheck?.error };
       }
 
-      // Generate a secure temporary password
-      const tempPassword = this.generateTemporaryPassword();
+      console.log('Creating user with enhanced temp password workflow:', { ...userData, password: '[REDACTED]' });
       
-      console.log('Creating user with data:', { ...userData, password: '[REDACTED]' });
-      
-      const { data: authData, error: authError } = await supabase?.auth?.signUp({
+      // Use the new enhanced database function for user creation
+      const { data: createResult, error: createError } = await supabase?.rpc(
+        'create_user_with_temp_password',
+        {
+          user_email: userData?.email,
+          user_full_name: userData?.full_name,
+          user_role: userData?.role || 'rep',
+          user_phone: userData?.phone || null,
+          user_organization: userData?.organization || null,
+          target_tenant_id: userData?.tenant_id || null
+        }
+      );
+
+      if (createError) {
+        console.error('Error creating user with temp password:', createError);
+        return { success: false, error: createError?.message || 'Failed to create user account' };
+      }
+
+      const result = createResult?.[0];
+      if (!result?.success) {
+        return { success: false, error: result?.message || 'Failed to create user account' };
+      }
+
+      console.log('User created successfully with temp password:', result?.user_id);
+
+      // Send confirmation email with enhanced redirect
+      const { error: emailError } = await supabase?.auth?.signUp({
         email: userData?.email,
-        password: tempPassword,
+        password: result?.temp_password, // Use the generated temp password
         options: {
+          emailRedirectTo: `${window.location?.origin}/password-setup?email=${encodeURIComponent(userData?.email)}`,
           data: {
             full_name: userData?.full_name,
             role: userData?.role || 'rep',
-            phone: userData?.phone || null,
-            tenant_id: userData?.tenant_id || null
-          },
-          emailRedirectTo: `${window.location?.origin}/password-setup`
+            temp_password_provided: true
+          }
         }
       });
 
-      if (authError || !authData?.user) {
-        console.error('Error creating user account:', authError);
-        return { success: false, error: authError?.message || 'Failed to create user account' };
-      }
-
-      console.log('User created successfully:', authData?.user?.id);
-
-      // Update user profile with tenant assignment if provided
-      if (userData?.tenant_id) {
-        const { error: updateError } = await supabase
-          ?.from('user_profiles')
-          ?.update({ 
-            tenant_id: userData?.tenant_id,
-            updated_at: new Date()?.toISOString()
-          })
-          ?.eq('id', authData?.user?.id);
-
-        if (updateError) {
-          console.error('Error assigning user to tenant:', updateError);
-          // User is created but tenant assignment failed
-          return { 
-            success: true, 
-            data: authData?.user,
-            warning: 'User created but tenant assignment failed',
-            tempPassword,
-            instructions: 'User will receive an email to set up their password. Make sure they check their spam folder.'
-          };
-        }
-        
-        console.log('User assigned to tenant successfully');
+      if (emailError) {
+        console.warn('Email sending failed, but user was created:', emailError);
+        // Return success with temp password for manual delivery
+        return { 
+          success: true, 
+          data: {
+            id: result?.user_id,
+            email: userData?.email,
+            temp_password: result?.temp_password
+          },
+          warning: 'User created but confirmation email failed to send',
+          tempPassword: result?.temp_password,
+          instructions: 'User can use the temporary password at /temporary-password-setup or wait for the email confirmation. Temp password: ' + result?.temp_password
+        };
       }
 
       return { 
         success: true, 
-        data: authData?.user,
-        tempPassword,
-        instructions: 'User will receive an email invitation to set up their password. They should check their email (including spam folder) and follow the link to create their password.'
+        data: {
+          id: result?.user_id,
+          email: userData?.email
+        },
+        tempPassword: result?.temp_password,
+        instructions: 'User will receive an email invitation to set up their password. If they cannot access email, they can use the temporary password at /temporary-password-setup. Temp password: ' + result?.temp_password
       };
     } catch (error) {
       console.error('Admin service error:', error);
@@ -1000,6 +1009,49 @@ export const adminService = {
     } catch (error) {
       console.error('Get current user error:', error);
       return { success: false, error: 'Failed to get current user' };
+    }
+  },
+
+  // Enhanced method to generate temporary password for existing users
+  async generateTemporaryPasswordForUser(userEmail) {
+    if (!userEmail) {
+      return { success: false, error: 'User email is required' };
+    }
+
+    try {
+      // Validate session before making API calls
+      const sessionCheck = await this._validateSession();
+      if (!sessionCheck?.valid) {
+        return { success: false, error: sessionCheck?.error };
+      }
+
+      const { data: tempPasswordResult, error: tempPasswordError } = await supabase?.rpc(
+        'generate_temp_password_for_user',
+        { user_email: userEmail }
+      );
+
+      if (tempPasswordError) {
+        console.error('Error generating temporary password:', tempPasswordError);
+        return { success: false, error: tempPasswordError?.message || 'Failed to generate temporary password' };
+      }
+
+      const result = tempPasswordResult?.[0];
+      if (!result?.success) {
+        return { success: false, error: result?.message || 'Failed to generate temporary password' };
+      }
+
+      return { 
+        success: true, 
+        data: {
+          temp_password: result?.temp_password,
+          expires_at: result?.expires_at,
+          message: result?.message
+        },
+        message: `Temporary password generated for ${userEmail}. Password: ${result?.temp_password} (expires: ${new Date(result?.expires_at)?.toLocaleString()})`
+      };
+    } catch (error) {
+      console.error('Admin service error:', error);
+      return { success: false, error: 'Failed to generate temporary password' };
     }
   },
 

@@ -15,6 +15,7 @@ const LoginForm = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [magicLinkSending, setMagicLinkSending] = useState(false);
 
   const handleChange = (e) => {
@@ -31,34 +32,34 @@ const LoginForm = () => {
     e?.preventDefault();
     setLoading(true);
     setError('');
-
-    // Basic validation
-    if (!formData?.email || !formData?.password) {
-      setError('Please fill in all fields');
-      setLoading(false);
-      return;
-    }
+    setSuccess('');
 
     try {
       const result = await signIn(formData?.email, formData?.password);
 
-      if (!result?.error) {
+      if (result?.error) {
+        setError(result?.error?.message || 'Login failed');
+        return;
+      }
+
+      if (result?.data?.user) {
         // Check if user needs password setup or profile completion
         if (result?.needsPasswordSetup || result?.profileIncomplete) {
-          navigate('/password-setup', { 
-            state: { 
-              email: formData?.email,
+          navigate('/password-setup', {
+            state: {
               needsPasswordSetup: result?.needsPasswordSetup,
-              profileIncomplete: result?.profileIncomplete
+              profileIncomplete: result?.profileIncomplete,
+              email: result?.data?.user?.email,
+              message: result?.needsPasswordSetup 
+                ? 'Please set up your password to complete your account.'
+                : 'Please complete your profile setup.'
             }
           });
           return;
         }
 
-        // Redirect based on user role
-        const userProfile = result?.data?.profile;
-        const userRole = userProfile?.role || 'rep';
-        
+        // User is fully set up - redirect to appropriate dashboard
+        const userRole = result?.data?.profile?.role || 'rep';
         switch (userRole) {
           case 'super_admin': navigate('/super-admin-dashboard');
             break;
@@ -69,26 +70,13 @@ const LoginForm = () => {
           default:
             navigate('/today');
         }
-      } else {
-        // Enhanced error handling for specific authentication issues
-        const errorMessage = result?.error?.message || result?.error || 'Failed to sign in';
-        
-        if (errorMessage?.includes('Invalid login credentials')) {
-          setError('Invalid email or password. Please check your credentials and try again.');
-        } else if (errorMessage?.includes('Email not confirmed')) {
-          setError('Please check your email and click the confirmation link before signing in.');
-        } else if (errorMessage?.includes('Too many requests')) {
-          setError('Too many login attempts. Please wait a moment before trying again.');
-        } else {
-          setError(errorMessage);
-        }
       }
     } catch (error) {
-      const errorMessage = error?.message || 'An unexpected error occurred';
-      setError(errorMessage);
+      console.error('Login error:', error);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const handleForgotPassword = () => {
@@ -133,6 +121,31 @@ const LoginForm = () => {
     setError('');
   };
 
+  // Add magic link login option
+  const handleMagicLinkLogin = async () => {
+    if (!formData?.email) {
+      setError('Please enter your email address to receive a magic link.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const result = await authService?.sendMagicLink(formData?.email);
+      
+      if (result?.success) {
+        setSuccess('Magic link sent! Please check your email and click the link to sign in.');
+      } else {
+        setError(result?.error || 'Failed to send magic link');
+      }
+    } catch (error) {
+      setError('Failed to send magic link. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -143,6 +156,19 @@ const LoginForm = () => {
               type="button"
               onClick={() => setError('')}
               className="ml-2 text-red-500 hover:text-red-700"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        
+        {success && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">
+            {success}
+            <button 
+              type="button"
+              onClick={() => setSuccess('')}
+              className="ml-2 text-green-500 hover:text-green-700"
             >
               ×
             </button>
@@ -199,27 +225,26 @@ const LoginForm = () => {
           </button>
         </div>
 
-        <Button
-          type="submit"
-          className="w-full"
-          disabled={loading}
-        >
-          {loading ? 'Signing In...' : 'Sign In'}
-        </Button>
+        <div className="flex flex-col space-y-3">
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading}
+            loading={loading}
+          >
+            {loading ? 'Signing in...' : 'Sign In'}
+          </Button>
 
-        {/* Enhanced authentication options */}
-        <div className="text-center">
-          <span className="text-sm text-gray-500">or</span>
+          {/* Magic Link Option */}
+          <button
+            type="button"
+            onClick={handleMagicLinkLogin}
+            disabled={loading}
+            className="w-full px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Sending...' : 'Send Magic Link Instead'}
+          </button>
         </div>
-        
-        <button
-          type="button"
-          onClick={handleSendMagicLink}
-          disabled={loading || magicLinkSending}
-          className="w-full px-4 py-2 text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {magicLinkSending ? 'Sending Magic Link...' : 'Send Magic Link'}
-        </button>
       </form>
       
       {/* Demo Credentials Section */}

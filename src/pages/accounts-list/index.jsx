@@ -6,16 +6,17 @@ import Header from '../../components/ui/Header';
 import SidebarNavigation from '../../components/ui/SidebarNavigation';
 import QuickActionButton from '../../components/ui/QuickActionButton';
 import AddAccountModal from '../../components/ui/AddAccountModal';
-import AccountsTable from './components/AccountsTable';
+import { AccountsTable } from './components/AccountsTable';
 import FilterToolbar from './components/FilterToolbar';
 import BulkActions from './components/BulkActions';
 import Pagination from './components/Pagination';
 import ViewOptions from './components/ViewOptions';
+import { AssignRepsModal } from '../manager-dashboard/components/AssignRepsModal';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { accountsService } from '../../services/accountsService';
 
-const AccountsList = () => {
+export default function AccountsList() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -43,6 +44,10 @@ const AccountsList = () => {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Add missing state variables for assign reps modal
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedAccountForReps, setSelectedAccountForReps] = useState(null);
 
   // Load accounts
   const loadAccounts = async () => {
@@ -51,11 +56,8 @@ const AccountsList = () => {
     setLoading(true);
     setError(null);
 
+    // Remove filters from service call - handle filtering client-side only
     const filters = {
-      searchTerm,
-      companyType: companyTypeFilter,
-      stage: stageFilter,
-      assignedRep: assignedRepFilter,
       showInactive,
       sortBy: sortConfig?.key,
       sortDirection: sortConfig?.direction,
@@ -246,8 +248,28 @@ const AccountsList = () => {
     setIsAddAccountModalOpen(true);
   };
 
+  // Add missing handler functions
+  const handleViewAccount = (account) => {
+    navigate(`/accounts/${account?.id}`);
+  };
+
+  const handleEditAccount = (account) => {
+    navigate(`/accounts/${account?.id}/edit`);
+  };
+
+  const handleAssignReps = (account) => {
+    setSelectedAccountForReps(account);
+    setShowAssignModal(true);
+  };
+
+  const handleAssignSuccess = () => {
+    loadAccounts(); // Refresh accounts list to show updated assignments
+    setShowAssignModal(false);
+    setSelectedAccountForReps(null);
+  };
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <Header
         userRole={user?.user_metadata?.role || 'rep'}
@@ -355,16 +377,22 @@ const AccountsList = () => {
 
           {/* Accounts Table */}
           {!loading && (
-            <AccountsTable
-              accounts={filteredAccounts}
-              selectedAccounts={selectedAccounts}
-              onSelectAccount={handleSelectAccount}
-              onSelectAll={handleSelectAll}
-              sortConfig={sortConfig}
-              onSort={handleSort}
-              currentPage={currentPage}
-              itemsPerPage={itemsPerPage}
-            />
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <AccountsTable
+                accounts={filteredAccounts}
+                onView={handleViewAccount}
+                onEdit={handleEditAccount}
+                onAssignReps={handleAssignReps}
+                selectedAccounts={selectedAccounts}
+                onSelectAccount={handleSelectAccount}
+                onSelectAll={handleSelectAll}
+                currentUser={user}
+                sortConfig={sortConfig}
+                onSort={handleSort}
+                currentPage={currentPage}
+                itemsPerPage={itemsPerPage}
+              />
+            </div>
           )}
 
           {/* Pagination */}
@@ -388,8 +416,17 @@ const AccountsList = () => {
         onClose={() => setIsAddAccountModalOpen(false)}
         onAccountAdded={handleAccountAdded}
       />
+      
+      {/* Assign Reps Modal */}
+      <AssignRepsModal
+        isOpen={showAssignModal}
+        onClose={() => {
+          setShowAssignModal(false);
+          setSelectedAccountForReps(null);
+        }}
+        account={selectedAccountForReps}
+        onSuccess={handleAssignSuccess}
+      />
     </div>
   );
-};
-
-export default AccountsList;
+}

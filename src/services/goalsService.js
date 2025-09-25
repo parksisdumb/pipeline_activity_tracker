@@ -28,19 +28,128 @@ export const goalsService = {
     }
   },
 
-  // Bulk create or update goals for multiple users
+  // Bulk create or update goals for multiple users using manager function
   async bulkSetGoals(userIds, weekStartDate, goals) {
     if (!userIds?.length) return { success: false, error: 'No users selected' };
     if (!weekStartDate) return { success: false, error: 'Week start date is required' };
     if (!goals || Object.keys(goals)?.length === 0) return { success: false, error: 'No goals provided' };
 
     try {
-      const goalTypes = ['accounts_added', 'contacts_reached', 'pop_ins', 'conversations', 'follow_ups', 'inspections_booked', 'proposals_sent'];
+      // Get current user to determine if they are a manager
+      const { data: { user: currentUser } } = await supabase?.auth?.getUser();
+      if (!currentUser) {
+        return { success: false, error: 'User not authenticated' };
+      }
+
+      // Get user profile to check role
+      const { data: userProfile } = await supabase?.from('user_profiles')?.select('id, role')?.eq('id', currentUser?.id)?.single();
+
+      // If user is a manager, use the manager function for RLS compliance
+      if (userProfile?.role === 'manager') {
+        return await this.managerBulkSetGoals(userIds, weekStartDate, goals);
+      } else {
+        // For non-managers (reps), use direct insert approach 
+        return await this.directBulkSetGoals(userIds, weekStartDate, goals);
+      }
+    } catch (error) {
+      if (error?.message?.includes('Failed to fetch')) {
+        return { 
+          success: false, 
+          error: 'Cannot connect to database. Your Supabase project may be paused or inactive.' 
+        };
+      }
+      return { success: false, error: 'Failed to set goals' };
+    }
+  },
+
+  // Manager-specific bulk goal assignment using the secure function
+  async managerBulkSetGoals(userIds, weekStartDate, goals) {
+    try {
+      // Get current user ID for manager assignment
+      const { data: { user: currentUser } } = await supabase?.auth?.getUser();
+      if (!currentUser) {
+        return { success: false, error: 'User not authenticated' };
+      }
+
+      // Enhanced validation: Check if user is actually a manager
+      const { data: userProfile } = await supabase?.from('user_profiles')?.select('id, role, full_name, tenant_id')?.eq('id', currentUser?.id)?.single();
+      
+      if (!userProfile) {
+        return { success: false, error: 'User profile not found' };
+      }
+
+      if (!['manager', 'admin', 'super_admin']?.includes(userProfile?.role)) {
+        return { success: false, error: 'Insufficient permissions. Only managers, admins, and super admins can set team goals.' };
+      }
+
+      // Transform data to match the manager_assign_team_goals function format
+      const assignments = userIds?.map(userId => ({
+        rep_id: userId,
+        goals: Object.keys(goals)?.map(goalType => ({
+          type: goalType,
+          target: goals?.[goalType] || 0,
+          current: 0
+        }))
+      }));
+
+      const goalData = {
+        week_start: weekStartDate,
+        assignments: assignments
+      };
+
+      console.log('Setting goals via manager function:', {
+        manager_id: currentUser?.id,
+        manager_name: userProfile?.full_name,
+        manager_role: userProfile?.role,
+        week_start: weekStartDate,
+        assignments_count: assignments?.length,
+        goal_types: Object.keys(goals)
+      });
+
+      // Call the secure manager function
+      const { data, error } = await supabase?.rpc('manager_assign_team_goals', {
+        manager_uuid: currentUser?.id,
+        goal_data: goalData
+      });
+
+      if (error) {
+        console.error('Manager assign goals error:', error);
+        return { success: false, error: `Failed to set goals: ${error?.message}` };
+      }
+
+      // The function returns an array of results
+      const result = Array.isArray(data) ? data?.[0] : data;
+      
+      if (result?.success) {
+        console.log('Goals assigned successfully:', result);
+        return { 
+          success: true, 
+          data: result, 
+          count: result?.goals_assigned || 0,
+          message: result?.message || 'Goals assigned successfully'
+        };
+      } else {
+        return { 
+          success: false, 
+          error: result?.message || 'Failed to assign goals. Please check that team members are properly assigned to you as their manager.' 
+        };
+      }
+    } catch (error) {
+      console.error('Manager bulk set goals error:', error);
+      return { success: false, error: 'Failed to set goals via manager function. Please check your network connection and try again.' };
+    }
+  },
+
+  // Direct bulk goal setting for reps (non-managers)
+  async directBulkSetGoals(userIds, weekStartDate, goals) {
+    try {
+      // Updated goal types to match UI expectations
+      const goalTypes = ['pop_ins', 'dm_conversations', 'assessments_booked', 'proposals_sent', 'wins'];
       const goalsToInsert = [];
 
       for (const userId of userIds) {
         for (const goalType of goalTypes) {
-          if (goals?.[goalType] !== undefined && goals?.[goalType] > 0) {
+          if (goals?.[goalType] !== undefined && goals?.[goalType] >= 0) {
             goalsToInsert?.push({
               user_id: userId,
               week_start_date: weekStartDate,
@@ -48,6 +157,7 @@ export const goalsService = {
               target_value: goals?.[goalType],
               current_value: 0,
               status: 'Not Started'
+              // Note: tenant_id will be set by the trigger function automatically
             });
           }
         }
@@ -64,25 +174,22 @@ export const goalsService = {
         ?.eq('week_start_date', weekStartDate);
 
       if (deleteError) {
-        console.error('Delete existing goals error:', deleteError);
-        return { success: false, error: deleteError?.message };
+        return { success: false, error: `Failed to clear existing goals: ${deleteError?.message}` };
       }
 
-      // Then insert new goals
+      // Then insert new goals - tenant_id will be set by trigger
       const { data, error } = await supabase?.from('weekly_goals')?.insert(goalsToInsert)?.select(`
           *,
           user:user_profiles!user_id(id, full_name)
         `);
 
       if (error) {
-        console.error('Bulk set goals error:', error);
-        return { success: false, error: error?.message };
+        return { success: false, error: `Failed to set goals: ${error?.message}` };
       }
 
       return { success: true, data, count: data?.length || 0 };
     } catch (error) {
-      console.error('Service error:', error);
-      return { success: false, error: 'Failed to set goals' };
+      return { success: false, error: 'Failed to set goals via direct method' };
     }
   },
 
@@ -90,31 +197,25 @@ export const goalsService = {
   async createWeeklyGoalsFromTemplate(userIds, weekStartDate, template = 'standard') {
     const templates = {
       'aggressive': {
-        accounts_added: 8,
-        contacts_reached: 25,
         pop_ins: 20,
-        conversations: 15,
-        follow_ups: 12,
-        inspections_booked: 8,
-        proposals_sent: 5
+        dm_conversations: 25,
+        assessments_booked: 8,
+        proposals_sent: 5,
+        wins: 3
       },
       'standard': {
-        accounts_added: 5,
-        contacts_reached: 20,
         pop_ins: 15,
-        conversations: 12,
-        follow_ups: 8,
-        inspections_booked: 6,
-        proposals_sent: 4
+        dm_conversations: 20,
+        assessments_booked: 6,
+        proposals_sent: 4,
+        wins: 2
       },
       'conservative': {
-        accounts_added: 3,
-        contacts_reached: 15,
         pop_ins: 10,
-        conversations: 8,
-        follow_ups: 6,
-        inspections_booked: 4,
-        proposals_sent: 2
+        dm_conversations: 15,
+        assessments_booked: 4,
+        proposals_sent: 2,
+        wins: 1
       }
     };
 
@@ -165,7 +266,16 @@ export const goalsService = {
   // Create a new weekly goal
   async createWeeklyGoal(goalData) {
     try {
-      const { data, error } = await supabase?.from('weekly_goals')?.insert(goalData)?.select(`
+      // Ensure goal_type is valid
+      const validGoalTypes = ['pop_ins', 'dm_conversations', 'assessments_booked', 'proposals_sent', 'wins'];
+      if (!validGoalTypes?.includes(goalData?.goal_type)) {
+        return { success: false, error: `Invalid goal type. Must be one of: ${validGoalTypes?.join(', ')}` };
+      }
+
+      const { data, error } = await supabase?.from('weekly_goals')?.insert({
+        ...goalData,
+        // tenant_id will be set by trigger
+      })?.select(`
           *,
           user:user_profiles!user_id(id, full_name)
         `)?.single();
@@ -185,7 +295,10 @@ export const goalsService = {
     if (!goalId) return { success: false, error: 'Goal ID is required' };
 
     try {
-      const { data, error } = await supabase?.from('weekly_goals')?.update({ ...updates, updated_at: new Date()?.toISOString() })?.eq('id', goalId)?.select(`
+      const { data, error } = await supabase?.from('weekly_goals')?.update({ 
+        ...updates, 
+        updated_at: new Date()?.toISOString() 
+      })?.eq('id', goalId)?.select(`
           *,
           user:user_profiles!user_id(id, full_name)
         `)?.single();
@@ -222,7 +335,10 @@ export const goalsService = {
     if (!goalIds?.length) return { success: false, error: 'No goals selected' };
 
     try {
-      const { data, error } = await supabase?.from('weekly_goals')?.update({ ...updates, updated_at: new Date()?.toISOString() })?.in('id', goalIds)?.select();
+      const { data, error } = await supabase?.from('weekly_goals')?.update({ 
+        ...updates, 
+        updated_at: new Date()?.toISOString() 
+      })?.in('id', goalIds)?.select();
 
       if (error) {
         return { success: false, error: error?.message };
@@ -350,5 +466,39 @@ export const goalsService = {
     const weekStartDate = weekStart?.toISOString()?.split('T')?.[0];
 
     return this.getWeeklyGoals(userId, weekStartDate);
+  },
+
+  // Add helper function to debug manager relationships
+  async debugManagerRelationships(managerId) {
+    if (!managerId) return { success: false, error: 'Manager ID is required' };
+
+    try {
+      const { data, error } = await supabase?.rpc('debug_manager_team_relationships', {
+        manager_uuid: managerId
+      });
+
+      if (error) {
+        return { success: false, error: error?.message };
+      }
+
+      return { success: true, data: data || [] };
+    } catch (error) {
+      return { success: false, error: 'Failed to debug manager relationships' };
+    }
+  },
+
+  // Add helper function to establish manager relationships
+  async establishManagerRelationships() {
+    try {
+      const { data, error } = await supabase?.rpc('establish_manager_team_relationships');
+
+      if (error) {
+        return { success: false, error: error?.message };
+      }
+
+      return { success: true, data: data || [], count: data?.length || 0 };
+    } catch (error) {
+      return { success: false, error: 'Failed to establish manager relationships' };
+    }
   },
 };

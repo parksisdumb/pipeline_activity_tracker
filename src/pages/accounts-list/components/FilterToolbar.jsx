@@ -58,11 +58,10 @@ const FilterToolbar = ({
     { value: '', label: 'All Stages' },
     { value: 'Prospect', label: 'Prospect' },
     { value: 'Contacted', label: 'Contacted' },
-    { value: 'Qualified', label: 'Qualified' },
-    { value: 'Assessment Scheduled', label: 'Assessment Scheduled' },
-    { value: 'Proposal Sent', label: 'Proposal Sent' },
-    { value: 'Won', label: 'Won' },
-    { value: 'Lost', label: 'Lost' }
+    { value: 'Vendor Packet Request', label: 'Vendor Packet Request' },
+    { value: 'Vendor Packet Submitted', label: 'Vendor Packet Submitted' },
+    { value: 'Approved for Work', label: 'Approved for Work' },
+    { value: 'Actively Engaged', label: 'Actively Engaged' }
   ];
 
   // Build assigned rep options from real user data
@@ -112,6 +111,7 @@ const FilterToolbar = ({
       {/* Filter Controls */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Select
+          ref={null}
           placeholder="Filter by company type"
           options={companyTypeOptions}
           value={companyTypeFilter}
@@ -127,6 +127,7 @@ const FilterToolbar = ({
         />
         
         <Select
+          ref={null}
           placeholder="Filter by stage"
           options={stageOptions}
           value={stageFilter}
@@ -141,6 +142,7 @@ const FilterToolbar = ({
         />
         
         <Select
+          ref={null}
           placeholder={usersLoading ? "Loading representatives..." : "Filter by representative"}
           options={assignedRepOptions}
           value={assignedRepFilter}

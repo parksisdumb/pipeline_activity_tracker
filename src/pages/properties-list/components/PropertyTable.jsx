@@ -53,6 +53,17 @@ const PropertyTable = ({
     navigate(`/log-activity?type=assessment&propertyId=${propertyId}`);
   };
 
+  // Enhanced checkbox handlers to prevent event conflicts
+  const handleSelectAllChange = (e) => {
+    e?.stopPropagation();
+    onSelectAll(e?.target?.checked);
+  };
+
+  const handleIndividualCheckboxChange = (propertyId) => (e) => {
+    e?.stopPropagation();
+    onSelectProperty(propertyId, e?.target?.checked);
+  };
+
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden">
       {/* Desktop Table */}
@@ -61,11 +72,13 @@ const PropertyTable = ({
           <thead className="bg-muted border-b border-border">
             <tr>
               <th className="w-12 px-4 py-3">
-                <Checkbox
-                  checked={selectedProperties?.length === properties?.length && properties?.length > 0}
-                  indeterminate={selectedProperties?.length > 0 && selectedProperties?.length < properties?.length}
-                  onChange={(e) => onSelectAll(e?.target?.checked)}
-                />
+                <div onClick={(e) => e?.stopPropagation()}>
+                  <Checkbox
+                    checked={selectedProperties?.length === properties?.length && properties?.length > 0}
+                    indeterminate={selectedProperties?.length > 0 && selectedProperties?.length < properties?.length}
+                    onChange={handleSelectAllChange}
+                  />
+                </div>
               </th>
               <th className="text-left px-4 py-3 font-medium text-foreground">
                 <button
@@ -78,29 +91,29 @@ const PropertyTable = ({
               </th>
               <th className="text-left px-4 py-3 font-medium text-foreground">
                 <button
-                  onClick={() => onSort('account')}
+                  onClick={() => onSort('account_id')}
                   className="flex items-center space-x-1 hover:text-accent transition-colors"
                 >
                   <span>Account</span>
-                  {getSortIcon('account')}
+                  {getSortIcon('account_id')}
                 </button>
               </th>
               <th className="text-left px-4 py-3 font-medium text-foreground">
                 <button
-                  onClick={() => onSort('buildingType')}
+                  onClick={() => onSort('building_type')}
                   className="flex items-center space-x-1 hover:text-accent transition-colors"
                 >
                   <span>Building Type</span>
-                  {getSortIcon('buildingType')}
+                  {getSortIcon('building_type')}
                 </button>
               </th>
               <th className="text-left px-4 py-3 font-medium text-foreground">
                 <button
-                  onClick={() => onSort('roofType')}
+                  onClick={() => onSort('roof_type')}
                   className="flex items-center space-x-1 hover:text-accent transition-colors"
                 >
                   <span>Roof Type</span>
-                  {getSortIcon('roofType')}
+                  {getSortIcon('roof_type')}
                 </button>
               </th>
               <th className="text-left px-4 py-3 font-medium text-foreground">
@@ -114,11 +127,11 @@ const PropertyTable = ({
               </th>
               <th className="text-left px-4 py-3 font-medium text-foreground">
                 <button
-                  onClick={() => onSort('lastAssessment')}
+                  onClick={() => onSort('last_assessment')}
                   className="flex items-center space-x-1 hover:text-accent transition-colors"
                 >
                   <span>Last Assessment</span>
-                  {getSortIcon('lastAssessment')}
+                  {getSortIcon('last_assessment')}
                 </button>
               </th>
               <th className="w-24 px-4 py-3 font-medium text-foreground">Actions</th>
@@ -132,13 +145,12 @@ const PropertyTable = ({
                 className="hover:bg-muted/50 cursor-pointer transition-colors"
               >
                 <td className="px-4 py-3">
-                  <Checkbox
-                    checked={selectedProperties?.includes(property?.id)}
-                    onChange={(e) => {
-                      e?.stopPropagation();
-                      onSelectProperty(property?.id, e?.target?.checked);
-                    }}
-                  />
+                  <div onClick={(e) => e?.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedProperties?.includes(property?.id)}
+                      onChange={handleIndividualCheckboxChange(property?.id)}
+                    />
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <div>
@@ -153,7 +165,7 @@ const PropertyTable = ({
                   <div className="text-foreground">{property?.building_type}</div>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="text-foreground">{property?.roofType}</div>
+                  <div className="text-foreground">{property?.roof_type}</div>
                 </td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStageColor(property?.stage)}`}>
@@ -161,7 +173,7 @@ const PropertyTable = ({
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="text-foreground">{formatDate(property?.lastAssessment)}</div>
+                  <div className="text-foreground">{formatDate(property?.last_assessment)}</div>
                 </td>
                 <td className="px-4 py-3">
                   <Button
@@ -189,14 +201,15 @@ const PropertyTable = ({
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-start space-x-3 flex-1 min-w-0">
-                <Checkbox
-                  checked={selectedProperties?.includes(property?.id)}
-                  onChange={(e) => {
-                    e?.stopPropagation();
-                    onSelectProperty(property?.id, e?.target?.checked);
-                  }}
+                <div 
+                  onClick={(e) => e?.stopPropagation()}
                   className="mt-1"
-                />
+                >
+                  <Checkbox
+                    checked={selectedProperties?.includes(property?.id)}
+                    onChange={handleIndividualCheckboxChange(property?.id)}
+                  />
+                </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-foreground truncate">{property?.name}</h3>
                   <p className="text-sm text-muted-foreground truncate">{property?.address}</p>
@@ -217,11 +230,11 @@ const PropertyTable = ({
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <span className="text-muted-foreground">Building:</span>
-                <span className="ml-1 text-foreground">{property?.buildingType}</span>
+                <span className="ml-1 text-foreground">{property?.building_type}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Roof:</span>
-                <span className="ml-1 text-foreground">{property?.roofType}</span>
+                <span className="ml-1 text-foreground">{property?.roof_type}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Stage:</span>
@@ -231,7 +244,7 @@ const PropertyTable = ({
               </div>
               <div>
                 <span className="text-muted-foreground">Last Assessment:</span>
-                <span className="ml-1 text-foreground">{formatDate(property?.lastAssessment)}</span>
+                <span className="ml-1 text-foreground">{formatDate(property?.last_assessment)}</span>
               </div>
             </div>
           </div>

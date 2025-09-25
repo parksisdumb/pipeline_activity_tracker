@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Lock, User, Building, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';
-
 
 const PasswordSetupPage = () => {
   const location = useLocation();
@@ -33,6 +33,7 @@ const PasswordSetupPage = () => {
   const stateData = location?.state || {};
   const needsPasswordSetup = stateData?.needsPasswordSetup;
   const profileIncomplete = stateData?.profileIncomplete;
+  const isRecovery = stateData?.isRecovery;
 
   const roleOptions = [
     { value: 'rep', label: 'Sales Representative' },
@@ -88,6 +89,9 @@ const PasswordSetupPage = () => {
       return;
     }
 
+    // Get detailed auth status on component mount
+    checkAuthenticationStatus();
+
     // Pre-fill form data from user profile if available
     if (userProfile) {
       setFormData(prev => ({
@@ -106,6 +110,30 @@ const PasswordSetupPage = () => {
       }));
     }
   }, [user, userProfile, stateData, navigate]);
+
+  const checkAuthenticationStatus = async () => {
+    if (!user?.id) return;
+
+    try {
+      const { data: authStatus, error: statusError } = await supabase?.rpc(
+        'get_detailed_user_auth_status',
+        { user_uuid: user?.id }
+      );
+
+      if (statusError) {
+        console.warn('Could not get detailed auth status:', statusError);
+        return;
+      }
+
+      const status = authStatus?.[0];
+      if (status && status?.next_action === 'dashboard') {
+        // User is fully set up, redirect to appropriate dashboard
+        navigate(status?.redirect_url || '/today', { replace: true });
+      }
+    } catch (error) {
+      console.warn('Error checking authentication status:', error);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e?.target || {};
@@ -140,7 +168,7 @@ const PasswordSetupPage = () => {
       return 'Full name is required';
     }
 
-    if (needsPasswordSetup) {
+    if (needsPasswordSetup && !isRecovery) {
       if (!formData?.password) {
         return 'Password is required';
       }
@@ -171,41 +199,62 @@ const PasswordSetupPage = () => {
     setLoading(true);
 
     try {
-      // Step 1: Update password if needed
-      if (needsPasswordSetup && formData?.password) {
+      // Step 1: Update password if needed (including recovery)
+      if ((needsPasswordSetup || isRecovery) && formData?.password) {
         const passwordResult = await updatePassword(formData?.password);
         if (!passwordResult?.success) {
           setError(`Failed to set password: ${passwordResult?.error}`);
           return;
         }
+
+        // Mark password as completed in database
+        if (user?.id) {
+          const { data: passwordCompleteResult, error: passwordCompleteError } = await supabase?.rpc(
+            'complete_password_setup',
+            { 
+              user_uuid: user?.id,
+              mark_password_complete: true
+            }
+          );
+
+          if (passwordCompleteError) {
+            console.warn('Could not mark password as complete:', passwordCompleteError);
+          }
+        }
       }
 
-      // Step 2: Complete profile setup
-      const profileResult = await completeProfileSetup({
-        fullName: formData?.fullName,
-        role: formData?.role,
-        organization: formData?.organization || null
-      });
+      // Step 2: Complete profile setup using enhanced function
+      const { data: setupResult, error: setupError } = await supabase?.rpc(
+        'complete_user_setup_enhanced',
+        {
+          user_email: user?.email,
+          profile_data: {
+            fullName: formData?.fullName,
+            role: formData?.role,
+            organization: formData?.organization || null
+          },
+          mark_password_set: needsPasswordSetup || isRecovery
+        }
+      );
 
-      if (profileResult?.success) {
+      if (setupError) {
+        setError(`Failed to complete profile setup: ${setupError?.message}`);
+        return;
+      }
+
+      const result = setupResult?.[0];
+      if (result?.success) {
         setSuccess('Account setup completed successfully! Redirecting to your dashboard...');
 
-        // Redirect to dashboard after successful setup
+        // Redirect based on the function's recommendation
+        const redirectUrl = result?.redirect_to;
+        const dashboardUrl = getDashboardUrl(redirectUrl);
+
         setTimeout(() => {
-          const targetRole = formData?.role;
-          switch (targetRole) {
-            case 'super_admin': navigate('/super-admin-dashboard', { replace: true });
-              break;
-            case 'admin': navigate('/admin-dashboard', { replace: true });
-              break;
-            case 'manager': navigate('/manager-dashboard', { replace: true });
-              break;
-            default:
-              navigate('/today', { replace: true });
-          }
+          navigate(dashboardUrl, { replace: true });
         }, 2000);
       } else {
-        setError(profileResult?.error?.message || 'Failed to complete profile setup');
+        setError(result?.message || 'Failed to complete profile setup');
       }
 
     } catch (error) {
@@ -213,6 +262,20 @@ const PasswordSetupPage = () => {
       setError('An unexpected error occurred during setup. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getDashboardUrl = (redirectTo) => {
+    switch (redirectTo) {
+      case 'super-admin-dashboard': 
+        return '/super-admin-dashboard';
+      case 'admin-dashboard': 
+        return '/admin-dashboard';
+      case 'manager-dashboard': 
+        return '/manager-dashboard';
+      case 'today':
+      default:
+        return '/today';
     }
   };
 
@@ -234,20 +297,25 @@ const PasswordSetupPage = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         {/* Enhanced welcome message based on setup type */}
-        {(needsPasswordSetup || profileIncomplete) && (
+        {(needsPasswordSetup || profileIncomplete || isRecovery) && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center space-x-2">
               <AlertCircle className="w-5 h-5 text-blue-600" />
               <div>
-                <h3 className="font-medium text-blue-800">Setup Required</h3>
+                <h3 className="font-medium text-blue-800">
+                  {isRecovery ? 'Password Reset' : 'Setup Required'}
+                </h3>
                 <p className="text-sm text-blue-700">
-                  {needsPasswordSetup && profileIncomplete && 
+                  {isRecovery && 
+                    'Please set your new password and update your profile information.'
+                  }
+                  {!isRecovery && needsPasswordSetup && profileIncomplete && 
                     'Please create a password and complete your profile to continue.'
                   }
-                  {needsPasswordSetup && !profileIncomplete && 
+                  {!isRecovery && needsPasswordSetup && !profileIncomplete && 
                     'Please create a password to complete your account setup.'
                   }
-                  {!needsPasswordSetup && profileIncomplete && 
+                  {!isRecovery && !needsPasswordSetup && profileIncomplete && 
                     'Please complete your profile information to continue.'
                   }
                 </p>
@@ -260,12 +328,14 @@ const PasswordSetupPage = () => {
         <div className="bg-card border border-border rounded-lg p-6">
           <div className="text-center space-y-2 mb-6">
             <h1 className="text-2xl font-bold text-foreground">
-              {needsPasswordSetup ? 'Complete Your Setup' : 'Update Your Profile'}
+              {isRecovery ? 'Reset Your Password' : needsPasswordSetup ?'Complete Your Setup' : 'Update Your Profile'}
             </h1>
             <p className="text-muted-foreground">
-              {needsPasswordSetup 
-                ? 'Set up your password and complete your profile to access your dashboard'
-                : 'Update your profile information to continue'
+              {isRecovery ? 
+                'Set your new password and update your profile information' :
+                needsPasswordSetup ? 
+                'Set up your password and complete your profile to access your dashboard' :
+                'Update your profile information to continue'
               }
             </p>
             {stateData?.email && (
@@ -358,13 +428,13 @@ const PasswordSetupPage = () => {
               </div>
             </div>
 
-            {/* Only show password fields if password setup is needed */}
-            {needsPasswordSetup && (
+            {/* Show password fields if password setup is needed OR this is a recovery */}
+            {(needsPasswordSetup || isRecovery) && (
               <>
                 {/* Password */}
                 <div className="space-y-2">
                   <label htmlFor="password" className="block text-sm font-medium text-foreground">
-                    Password
+                    {isRecovery ? 'New Password' : 'Password'}
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -374,7 +444,7 @@ const PasswordSetupPage = () => {
                       type={showPassword ? "text" : "password"}
                       value={formData?.password}
                       onChange={handleInputChange}
-                      placeholder="Create a secure password"
+                      placeholder={isRecovery ? "Enter your new password" : "Create a secure password"}
                       className="pl-10 pr-10"
                       disabled={loading}
                       autoComplete="new-password"
@@ -417,7 +487,7 @@ const PasswordSetupPage = () => {
                 {/* Confirm Password */}
                 <div className="space-y-2">
                   <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground">
-                    Confirm Password
+                    Confirm {isRecovery ? 'New ' : ''}Password
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -463,24 +533,33 @@ const PasswordSetupPage = () => {
             <Button
               type="submit"
               className="w-full"
-              disabled={loading || (needsPasswordSetup && passwordStrength?.score < 3)}
+              disabled={loading || ((needsPasswordSetup || isRecovery) && passwordStrength?.score < 3)}
               loading={loading}
             >
-              {loading ? 'Setting Up Account...' : (needsPasswordSetup ? 'Complete Setup' : 'Update Profile')}
+              {loading ? 
+                'Setting Up Account...' : 
+                isRecovery ? 
+                'Reset Password & Update Profile' :
+                needsPasswordSetup ? 
+                'Complete Setup' : 
+                'Update Profile'
+              }
             </Button>
           </form>
         </div>
 
         {/* Security Info */}
-        <div className="bg-card border border-border rounded-lg p-4">
-          <h3 className="font-medium text-foreground mb-2">Security Requirements</h3>
-          <div className="space-y-1 text-sm text-muted-foreground">
-            <p>• Minimum 8 characters</p>
-            <p>• At least one uppercase and lowercase letter</p>
-            <p>• At least one number</p>
-            <p>• At least one special character</p>
+        {(needsPasswordSetup || isRecovery) && (
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h3 className="font-medium text-foreground mb-2">Security Requirements</h3>
+            <div className="space-y-1 text-sm text-muted-foreground">
+              <p>• Minimum 8 characters</p>
+              <p>• At least one uppercase and lowercase letter</p>
+              <p>• At least one number</p>
+              <p>• At least one special character</p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Background Pattern */}
         <div className="fixed inset-0 -z-10 overflow-hidden">

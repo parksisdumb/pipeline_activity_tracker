@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import Header from '../../components/ui/Header';
-import SidebarNavigation from '../../components/ui/SidebarNavigation';
-import QuickActionButton from '../../components/ui/QuickActionButton';
+
+
+
 import EditAccountModal from '../../components/ui/EditAccountModal';
 import AccountHeader from './components/AccountHeader';
 import TabNavigation from './components/TabNavigation';
@@ -14,6 +14,11 @@ import { accountsService } from '../../services/accountsService';
 import { propertiesService } from '../../services/propertiesService';
 import { contactsService } from '../../services/contactsService';
 import { activitiesService } from '../../services/activitiesService';
+import { AssignRepsModal } from '../manager-dashboard/components/AssignRepsModal';
+import LinkPropertyModal from '../../components/ui/LinkPropertyModal';
+import AddContactModal from '../../components/ui/AddContactModal';
+
+
 
 const AccountDetails = () => {
   const navigate = useNavigate();
@@ -34,6 +39,10 @@ const AccountDetails = () => {
   const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  // Add missing state variables
+  const [showLinkPropertyModal, setShowLinkPropertyModal] = useState(false);
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
 
   // Mock contacts data - replace with actual service call
   const mockContacts = [
@@ -61,7 +70,7 @@ const AccountDetails = () => {
 
   useEffect(() => {
     if (!accountId) {
-      navigate('/accounts-list');
+      navigate('/accounts');
       return;
     }
     
@@ -94,7 +103,7 @@ const AccountDetails = () => {
         setError('Account not found');
         // Navigate back to accounts list after a delay
         setTimeout(() => {
-          navigate('/accounts-list');
+          navigate('/accounts');
         }, 2000);
       }
     } catch (err) {
@@ -272,7 +281,7 @@ const AccountDetails = () => {
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
-    // Update URL without full navigation
+    // Fix: Update URL with correct path
     const newParams = new URLSearchParams(searchParams);
     newParams?.set('tab', tabId);
     navigate(`/account-details/${accountId}?${newParams?.toString()}`, { replace: true });
@@ -307,6 +316,25 @@ const AccountDetails = () => {
 
   const handleMobileMenuToggle = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const handleAssignReps = () => {
+    setShowAssignModal(true);
+  };
+
+  const handleAssignSuccess = () => {
+    loadAccount(); // Refresh account data to show updated assignments
+  };
+
+  // Add missing handler functions
+  const handleLinkSuccess = () => {
+    loadProperties(); // Refresh properties after linking
+    setShowLinkPropertyModal(false);
+  };
+
+  const handleContactAdded = () => {
+    loadContacts(); // Refresh contacts after adding
+    setShowAddContactModal(false);
   };
 
   const renderTabContent = () => {
@@ -346,123 +374,81 @@ const AccountDetails = () => {
     }
   };
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading account details...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-destructive mb-2">Error</h2>
-          <p className="text-muted-foreground mb-4">{error}</p>
-          <button 
-            onClick={() => navigate('/accounts-list')}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-          >
-            Back to Accounts
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // No account found
-  if (!account) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-foreground mb-2">Account Not Found</h2>
-          <p className="text-muted-foreground mb-4">The requested account could not be found.</p>
-          <button 
-            onClick={() => navigate('/accounts-list')}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-          >
-            Back to Accounts
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-background">
-      {/* Mobile Header */}
-      <div className="lg:hidden">
-        <Header
-          userRole={user?.user_metadata?.role || 'rep'}
-          onMenuToggle={handleMobileMenuToggle}
-          isMenuOpen={isMobileMenuOpen}
-        />
-      </div>
-      
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:block">
-        <SidebarNavigation
-          userRole={user?.user_metadata?.role || 'rep'}
-          isCollapsed={isSidebarCollapsed}
-          onToggleCollapse={handleSidebarToggle}
-        />
-      </div>
-      
-      {/* Mobile Sidebar Overlay */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={handleMobileMenuToggle} />
-          <SidebarNavigation
-            userRole={user?.user_metadata?.role || 'rep'}
-            isCollapsed={false}
-            onToggleCollapse={handleMobileMenuToggle}
-            className="relative z-50"
-          />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+          {error}
         </div>
       )}
-      
-      {/* Main Content */}
-      <div className={`transition-all duration-200 ease-out ${
-        isSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-      } pt-16 lg:pt-0`}>
-        {/* Account Header */}
-        <AccountHeader
-          account={account}
-          onEditAccount={handleEditAccount}
-          onLogActivity={handleLogActivity}
-        />
 
-        {/* Tab Navigation */}
-        <TabNavigation
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          propertiesCount={properties?.length}
-          contactsCount={contacts?.length}
-          activitiesCount={activities?.length}
-        />
-
-        {/* Tab Content */}
-        <div className="p-6">
-          {renderTabContent()}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-lg text-gray-600">Loading account details...</span>
         </div>
-      </div>
-      
-      {/* Mobile Quick Action Button */}
-      <QuickActionButton onClick={handleLogActivity} />
+      ) : account ? (
+        <>
+          <AccountHeader 
+            account={account} 
+            onEdit={() => setIsEditModalOpen(true)}
+            onEditAccount={() => setIsEditModalOpen(true)}
+            onAssignReps={handleAssignReps}
+            onLogActivity={handleLogActivity}
+            currentUser={user}
+          />
 
-      {/* Edit Account Modal */}
-      <EditAccountModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onAccountUpdated={handleAccountUpdated}
-        account={account}
-      />
+          {/* Tab Navigation */}
+          <TabNavigation
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            propertiesCount={properties?.length}
+            contactsCount={contacts?.length}
+            activitiesCount={activities?.length}
+          />
+
+          {/* Tab Content */}
+          <div className="p-6">
+            {renderTabContent()}
+          </div>
+
+          {/* Existing Modals */}
+          <EditAccountModal
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            account={account}
+            onAccountUpdated={handleAccountUpdated}
+          />
+
+          <LinkPropertyModal
+            isOpen={showLinkPropertyModal}
+            onClose={() => setShowLinkPropertyModal(false)}
+            account={account}
+            contact={null}
+            onSuccess={handleLinkSuccess}
+          />
+
+          <AddContactModal
+            isOpen={showAddContactModal}
+            onClose={() => setShowAddContactModal(false)}
+            account={account}
+            onContactAdded={handleContactAdded}
+            onSuccess={handleContactAdded}
+          />
+
+          {/* New Assign Reps Modal */}
+          <AssignRepsModal
+            isOpen={showAssignModal}
+            onClose={() => setShowAssignModal(false)}
+            account={account}
+            onSuccess={handleAssignSuccess}
+          />
+        </>
+      ) : (
+        <div className="text-center py-12">
+          <p className="text-gray-500 text-lg">Account not found</p>
+        </div>
+      )}
     </div>
   );
 };

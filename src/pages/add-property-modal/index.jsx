@@ -270,7 +270,7 @@ const AddPropertyModal = () => {
       if (result?.success) {
         // Navigate back with success message
         if (preselectedAccountId) {
-          navigate(`/account-details/${preselectedAccountId}?tab=properties&success=property-added`);
+          navigate(`/accounts/${preselectedAccountId}?tab=properties&success=property-added`);
         } else {
           navigate('/properties-list?success=property-added');
         }
@@ -287,7 +287,7 @@ const AddPropertyModal = () => {
 
   const handleCancel = () => {
     if (preselectedAccountId) {
-      navigate(`/account-details/${preselectedAccountId}`);
+      navigate(`/accounts/${preselectedAccountId}`);
     } else {
       navigate(-1);
     }
@@ -389,7 +389,7 @@ const AddPropertyModal = () => {
                   <Select
                     label="State"
                     value={formData?.state}
-                    onChange={(e) => handleInputChange('state', e?.target?.value)}
+                    onChange={(value) => handleInputChange('state', value)}
                     options={usStates}
                     disabled={loading}
                     placeholder="Select state"
@@ -399,6 +399,7 @@ const AddPropertyModal = () => {
                     onOpenChange={() => {}}
                     name="state"
                     description=""
+                    ref={null}
                   />
 
                   <Input
@@ -422,7 +423,7 @@ const AddPropertyModal = () => {
                   <Select
                     label="Building Type *"
                     value={formData?.buildingType}
-                    onChange={(e) => handleInputChange('buildingType', e?.target?.value)}
+                    onChange={(value) => handleInputChange('buildingType', value)}
                     options={buildingTypes}
                     disabled={loading}
                     required
@@ -432,12 +433,13 @@ const AddPropertyModal = () => {
                     onOpenChange={() => {}}
                     name="buildingType"
                     description=""
+                    ref={null}
                   />
 
                   <Select
                     label="Roof Type"
                     value={formData?.roofType}
-                    onChange={(e) => handleInputChange('roofType', e?.target?.value)}
+                    onChange={(value) => handleInputChange('roofType', value)}
                     options={roofTypes}
                     disabled={loading}
                     onSearchChange={() => {}}
@@ -446,6 +448,7 @@ const AddPropertyModal = () => {
                     onOpenChange={() => {}}
                     name="roofType"
                     description=""
+                    ref={null}
                   />
                 </div>
 
@@ -479,7 +482,7 @@ const AddPropertyModal = () => {
                 <Select
                   label="Property Stage"
                   value={formData?.stage}
-                  onChange={(e) => handleInputChange('stage', e?.target?.value)}
+                  onChange={(value) => handleInputChange('stage', value)}
                   options={propertyStages}
                   disabled={loading}
                   onSearchChange={() => {}}
@@ -488,6 +491,7 @@ const AddPropertyModal = () => {
                   onOpenChange={() => {}}
                   name="stage"
                   description=""
+                  ref={null}
                 />
 
                 {/* Last Assessment Date */}
