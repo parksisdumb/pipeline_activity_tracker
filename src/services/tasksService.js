@@ -27,6 +27,30 @@ export const tasksService = {
     }
   },
 
+  // Get tasks by contact ID
+  async getTasksByContactId(contactId) {
+    try {
+      const { data, error } = await supabase?.from('tasks')?.select(`
+          *,
+          assigned_user:assigned_to(id, full_name, email),
+          creator:assigned_by(id, full_name, email),
+          account:account_id(id, name),
+          property:property_id(id, name),
+          contact:contact_id(id, first_name, last_name),
+          opportunity:opportunity_id(id, name)
+        `)?.eq('contact_id', contactId)?.order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.error('Failed to get tasks by contact ID:', error);
+      return { data: [], error };
+    }
+  },
+
   // Get task metrics using the database function
   async getTaskMetrics() {
     try {
@@ -68,7 +92,7 @@ export const tasksService = {
       const { data, error } = await supabase?.rpc('update_task_status', {
         task_uuid: taskId,
         new_status: newStatus,
-        completion_notes: completionNotes
+        completion_notes_param: completionNotes
       });
 
       if (error) {
@@ -137,11 +161,11 @@ export const tasksService = {
 
       const { data, error } = await supabase?.from('tasks')?.insert([{
           ...taskData,
-          created_by: user?.id
+          assigned_by: user?.id
         }])?.select(`
           *,
           assigned_user:assigned_to(id, full_name, email),
-          creator:created_by(id, full_name, email),
+          creator:assigned_by(id, full_name, email),
           account:account_id(id, name),
           property:property_id(id, name),
           contact:contact_id(id, first_name, last_name),
@@ -168,7 +192,7 @@ export const tasksService = {
         })?.eq('id', taskId)?.select(`
           *,
           assigned_user:assigned_to(id, full_name, email),
-          creator:created_by(id, full_name, email),
+          creator:assigned_by(id, full_name, email),
           account:account_id(id, name),
           property:property_id(id, name),
           contact:contact_id(id, first_name, last_name),

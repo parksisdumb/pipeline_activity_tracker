@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Clock, AlertTriangle, Plus, Filter, Search, User, Building2, Home, Target } from 'lucide-react';
 import tasksService from '../../services/tasksService';
 import Header from '../../components/ui/Header';
@@ -6,6 +7,7 @@ import Button from '../../components/ui/Button';
 import CreateTaskModal from '../create-task-modal';
 
 const TaskManagement = () => {
+  const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [filteredTasks, setFilteredTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,6 +103,10 @@ const TaskManagement = () => {
     setShowCreateModal(false);
   };
 
+  const handleTaskClick = (taskId) => {
+    navigate(`/task-details/${taskId}`);
+  };
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'completed':
@@ -157,7 +163,6 @@ const TaskManagement = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header onMenuToggle={() => setMenuOpen(!menuOpen)} />
-      
       {/* Main Content with responsive layout accounting for sidebar */}
       <div className="flex-1 lg:ml-60 pt-16">
         <div className="h-full flex flex-col p-4 sm:p-6 max-w-full">
@@ -337,7 +342,11 @@ const TaskManagement = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredTasks?.map((task) => (
-                        <tr key={task?.id} className="hover:bg-gray-50">
+                        <tr 
+                          key={task?.id} 
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => handleTaskClick(task?.id)}
+                        >
                           <td className="px-4 py-4">
                             <div>
                               <div className="text-sm font-medium text-gray-900 line-clamp-2">
@@ -378,7 +387,7 @@ const TaskManagement = () => {
                             </div>
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
+                            <div className="flex space-x-2" onClick={(e) => e?.stopPropagation()}>
                               {task?.status === 'pending' && (
                                 <button
                                   onClick={() => handleStatusUpdate(task?.id, 'in_progress')}
@@ -414,7 +423,11 @@ const TaskManagement = () => {
                 {/* Mobile Card View */}
                 <div className="md:hidden p-4 space-y-4">
                   {filteredTasks?.map((task) => (
-                    <div key={task?.id} className="border border-gray-200 rounded-lg p-4">
+                    <div 
+                      key={task?.id} 
+                      className="border border-gray-200 rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => handleTaskClick(task?.id)}
+                    >
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1 min-w-0">
                           <h3 className="text-sm font-medium text-gray-900 truncate">{task?.title}</h3>
@@ -448,7 +461,7 @@ const TaskManagement = () => {
                         <span className="text-sm text-gray-600">
                           {task?.assigned_to_name || 'Unassigned'}
                         </span>
-                        <div className="flex space-x-2">
+                        <div className="flex space-x-2" onClick={(e) => e?.stopPropagation()}>
                           {task?.status === 'pending' && (
                             <button
                               onClick={() => handleStatusUpdate(task?.id, 'in_progress')}
@@ -500,7 +513,6 @@ const TaskManagement = () => {
           </div>
         </div>
       </div>
-      
       {/* Create Task Modal */}
       <CreateTaskModal
         isOpen={showCreateModal}

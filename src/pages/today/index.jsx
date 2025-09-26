@@ -8,12 +8,15 @@ import WeeklyGoalsProgress from './components/WeeklyGoalsProgress';
 import RecentActivities from './components/RecentActivities';
 import QuickActions from './components/QuickActions';
 import TodayStats from './components/TodayStats';
+import YourTasks from './components/YourTasks';
+import CreateTaskModal from '../create-task-modal';
 import { useAuth } from '../../contexts/AuthContext';
 
 const TodayPage = () => {
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const { userProfile } = useAuth();
 
   // Get user role from auth context, default to 'rep'
@@ -30,6 +33,20 @@ const TodayPage = () => {
 
   const handleToggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  const handleOpenCreateTaskModal = () => {
+    setShowCreateTaskModal(true);
+  };
+
+  const handleCloseCreateTaskModal = () => {
+    setShowCreateTaskModal(false);
+  };
+
+  const handleTaskCreated = (newTask) => {
+    // Task created successfully, modal will close automatically
+    console.log('New task created:', newTask);
+    // You can add any additional logic here, like refreshing task lists
   };
 
   return (
@@ -141,6 +158,12 @@ const TodayPage = () => {
               {/* Today's Stats */}
               <TodayStats className="mb-6" />
 
+              {/* Your Tasks Section */}
+              <YourTasks 
+                className="mb-6" 
+                onCreateTask={handleOpenCreateTaskModal}
+              />
+
               {/* Weekly Goals Progress */}
               <WeeklyGoalsProgress className="mb-6" />
 
@@ -187,6 +210,13 @@ const TodayPage = () => {
       {userRole !== 'admin' && (
         <QuickActionButton variant="floating" onClick={() => navigate('/log-activity')} />
       )}
+
+      {/* Create Task Modal */}
+      <CreateTaskModal
+        isOpen={showCreateTaskModal}
+        onClose={handleCloseCreateTaskModal}
+        onTaskCreated={handleTaskCreated}
+      />
     </div>
   );
 };

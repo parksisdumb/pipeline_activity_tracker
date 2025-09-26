@@ -97,193 +97,195 @@ const OpportunitiesTable = ({
   return (
     <div>
       {/* Desktop Table */}
-      <div className="hidden md:block overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                <input
-                  type="checkbox"
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  checked={selectedOpportunities?.length === opportunities?.length && opportunities?.length > 0}
-                  onChange={handleSelectAll}
-                />
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => onSort?.('name')}
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Opportunity</span>
-                  {getSortIcon('name')}
-                </div>
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Account / Property
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => onSort?.('opportunity_type')}
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Type</span>
-                  {getSortIcon('opportunity_type')}
-                </div>
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => onSort?.('stage')}
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Stage</span>
-                  {getSortIcon('stage')}
-                </div>
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => onSort?.('bid_value')}
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Bid Value</span>
-                  {getSortIcon('bid_value')}
-                </div>
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => onSort?.('expected_close_date')}
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Expected Close</span>
-                  {getSortIcon('expected_close_date')}
-                </div>
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {opportunities?.length === 0 ? (
+      <div className="hidden md:block overflow-x-auto">
+        <div className="min-w-full inline-block align-middle">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <td colSpan="8" className="px-6 py-12 text-center">
-                  <div className="flex flex-col items-center">
-                    <DollarSign className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <h3 className="text-sm font-medium text-gray-900 mb-2">No opportunities found</h3>
-                    <p className="text-sm text-gray-500 mb-4">
-                      {error ? 'Unable to load opportunities data.' : 'Get started by creating your first sales opportunity.'}
-                    </p>
-                    {error && (
-                      <div className="mt-4 text-xs text-red-600 bg-red-50 p-3 rounded border border-red-200 max-w-md">
-                        <p className="font-semibold mb-2">Error Details:</p>
-                        <p className="mb-2">{error}</p>
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => window.location?.reload()}
-                            className="text-sm text-red-700 underline hover:text-red-900"
-                          >
-                            Refresh Page
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={selectedOpportunities?.length === opportunities?.length && opportunities?.length > 0}
+                    onChange={handleSelectAll}
+                  />
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[200px]"
+                  onClick={() => onSort?.('name')}
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>Opportunity</span>
+                    {getSortIcon('name')}
                   </div>
-                </td>
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[180px]">
+                  Account / Property
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
+                  onClick={() => onSort?.('opportunity_type')}
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>Type</span>
+                    {getSortIcon('opportunity_type')}
+                  </div>
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
+                  onClick={() => onSort?.('stage')}
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>Stage</span>
+                    {getSortIcon('stage')}
+                  </div>
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[120px]"
+                  onClick={() => onSort?.('bid_value')}
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>Bid Value</span>
+                    {getSortIcon('bid_value')}
+                  </div>
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap min-w-[140px]"
+                  onClick={() => onSort?.('expected_close_date')}
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>Expected Close</span>
+                    {getSortIcon('expected_close_date')}
+                  </div>
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  Actions
+                </th>
               </tr>
-            ) : (
-              opportunities?.map((opportunity) => (
-                <tr key={opportunity?.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      checked={selectedOpportunities?.includes(opportunity?.id)}
-                      onChange={(e) => handleSelectOpportunity(opportunity?.id, e?.target?.checked)}
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <div className="text-sm font-medium text-gray-900 truncate max-w-xs">
-                        {opportunity?.name || 'Unnamed Opportunity'}
-                      </div>
-                      {opportunity?.assigned_to && (
-                        <div className="text-xs text-gray-500 flex items-center mt-1">
-                          <User className="h-3 w-3 mr-1" />
-                          {opportunity?.assigned_to?.full_name}
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {opportunities?.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center">
+                      <DollarSign className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                      <h3 className="text-sm font-medium text-gray-900 mb-2">No opportunities found</h3>
+                      <p className="text-sm text-gray-500 mb-4">
+                        {error ? 'Unable to load opportunities data.' : 'Get started by creating your first sales opportunity.'}
+                      </p>
+                      {error && (
+                        <div className="mt-4 text-xs text-red-600 bg-red-50 p-3 rounded border border-red-200 max-w-md">
+                          <p className="font-semibold mb-2">Error Details:</p>
+                          <p className="mb-2">{error}</p>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => window.location?.reload()}
+                              className="text-sm text-red-700 underline hover:text-red-900"
+                            >
+                              Refresh Page
+                            </button>
+                          </div>
                         </div>
                       )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col space-y-1">
-                      <div className="text-sm text-gray-900">
-                        {opportunity?.account?.name || 'No Account'}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {opportunity?.property?.name || 'No Property'}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      {getTypeIcon(opportunity?.opportunity_type)}
-                      <span className="ml-2 text-sm text-gray-900 capitalize">
-                        {opportunity?.opportunity_type?.replace(/_/g, ' ') || '-'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStageColor(opportunity?.stage)}`}>
-                      {opportunity?.stage?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l?.toUpperCase()) || '-'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex flex-col">
-                      <div className="text-sm font-medium text-gray-900">
-                        {opportunitiesService?.formatBidValue(opportunity?.bid_value, opportunity?.currency)}
-                      </div>
-                      {opportunity?.probability > 0 && (
-                        <div className="text-xs text-gray-500">
-                          {opportunity?.probability}% probability
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-1 text-gray-400" />
-                      {formatDate(opportunity?.expected_close_date)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => onView?.(opportunity?.id)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="View Details"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => onEdit?.(opportunity)}
-                        className="text-yellow-600 hover:text-yellow-900"
-                        title="Edit"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => onDelete?.(opportunity?.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                opportunities?.map((opportunity) => (
+                  <tr key={opportunity?.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        checked={selectedOpportunities?.includes(opportunity?.id)}
+                        onChange={(e) => handleSelectOpportunity(opportunity?.id, e?.target?.checked)}
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <div className="text-sm font-medium text-gray-900 max-w-[180px] truncate">
+                          {opportunity?.name || 'Unnamed Opportunity'}
+                        </div>
+                        {opportunity?.assigned_to && (
+                          <div className="text-xs text-gray-500 flex items-center mt-1">
+                            <User className="h-3 w-3 mr-1 flex-shrink-0" />
+                            <span className="truncate">{opportunity?.assigned_to?.full_name}</span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col space-y-1">
+                        <div className="text-sm text-gray-900 max-w-[160px] truncate">
+                          {opportunity?.account?.name || 'No Account'}
+                        </div>
+                        <div className="text-xs text-gray-500 max-w-[160px] truncate">
+                          {opportunity?.property?.name || 'No Property'}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        {getTypeIcon(opportunity?.opportunity_type)}
+                        <span className="ml-2 text-sm text-gray-900 capitalize">
+                          {opportunity?.opportunity_type?.replace(/_/g, ' ') || '-'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStageColor(opportunity?.stage)}`}>
+                        {opportunity?.stage?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l?.toUpperCase()) || '-'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <div className="text-sm font-medium text-gray-900">
+                          {opportunitiesService?.formatBidValue(opportunity?.bid_value, opportunity?.currency)}
+                        </div>
+                        {opportunity?.probability > 0 && (
+                          <div className="text-xs text-gray-500">
+                            {opportunity?.probability}% probability
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-1 text-gray-400 flex-shrink-0" />
+                        <span>{formatDate(opportunity?.expected_close_date)}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => onView?.(opportunity?.id)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="View Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => onEdit?.(opportunity)}
+                          className="text-yellow-600 hover:text-yellow-900"
+                          title="Edit"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => onDelete?.(opportunity?.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Mobile Cards */}

@@ -153,7 +153,7 @@ const PropertyDetails = () => {
   };
 
   const handleBack = () => {
-    navigate('/properties-list');
+    navigate('/properties');
   };
 
   // Show loading state while auth is loading

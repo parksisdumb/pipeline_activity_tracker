@@ -33,7 +33,7 @@ const ContactHeader = ({ contact, onNavigateToAccount, onNavigateToProperty, onE
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate('/contacts-list')}
+            onClick={() => navigate('/contacts')}
             className="mr-4"
           >
             <Icon name="ArrowLeft" size={16} className="mr-2" />

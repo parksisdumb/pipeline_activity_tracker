@@ -8,8 +8,10 @@ import ActivitiesTab from './components/ActivitiesTab';
 import ProfileEditor from './components/ProfileEditor';
 import QuickActions from './components/QuickActions';
 import RelationshipMap from './components/RelationshipMap';
+import TasksTab from './components/TasksTab';
 
 import PropertiesModal from '../../components/ui/PropertiesModal';
+import CreateTaskModal from '../create-task-modal';
 import { contactsService } from '../../services/contactsService';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
@@ -25,6 +27,9 @@ const ContactDetails = () => {
   const [activities, setActivities] = useState([]);
   const [relatedContacts, setRelatedContacts] = useState([]);
   const [showPropertiesModal, setShowPropertiesModal] = useState(false);
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
+  const [showTasksModal, setShowTasksModal] = useState(false);
+  const [contactTasks, setContactTasks] = useState([]);
 
   // Enhanced parameter validation with better error handling
   useEffect(() => {
@@ -225,6 +230,23 @@ const ContactDetails = () => {
     }
   };
 
+  const handleShowTasks = () => {
+    setActiveTab('tasks');
+  };
+
+  const handleTaskCreated = (newTask) => {
+    console.log('New task created:', newTask);
+    setShowCreateTaskModal(false);
+    // Reload tasks if we're currently viewing the tasks tab
+    if (activeTab === 'tasks') {
+      // The TasksTab component will handle its own refresh
+    }
+  };
+
+  const handleCreateTask = () => {
+    setShowCreateTaskModal(true);
+  };
+
   // Enhanced loading state
   if (loading) {
     return (
@@ -379,6 +401,15 @@ const ContactDetails = () => {
                       <Icon name="Building2" size={16} className="mr-1 inline" />
                       Properties
                     </button>
+                    <button
+                      onClick={() => setActiveTab('tasks')}
+                      className={`text-sm font-medium pb-2 border-b-2 transition-colors ${
+                        activeTab === 'tasks' ?'border-primary text-primary' :'border-transparent text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Icon name="CheckSquare" size={16} className="mr-1 inline" />
+                      Tasks
+                    </button>
                   </div>
                 </div>
 
@@ -398,12 +429,34 @@ const ContactDetails = () => {
                       currentContact={contact}
                     />
                   )}
+
+                  {activeTab === 'tasks' && (
+                    <TasksTab 
+                      contactId={contact?.id}
+                      contact={contact}
+                      onCreateTask={handleCreateTask}
+                    />
+                  )}
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Create Task Modal */}
+      <CreateTaskModal
+        isOpen={showCreateTaskModal}
+        onClose={() => setShowCreateTaskModal(false)}
+        onTaskCreated={handleTaskCreated}
+        preSelectedEntity={{
+          type: 'contact',
+          id: contact?.id,
+          contactName: contact?.name,
+          accountName: contact?.account,
+          accountId: contact?.accountId
+        }}
+      />
 
       {/* Profile Editor Modal */}
       {isEditingProfile && (

@@ -35,11 +35,33 @@ const CreateTaskModal = ({ isOpen, onClose, onTaskCreated, preSelectedEntity = n
   useEffect(() => {
     if (isOpen) {
       loadAssignees();
-      if (formData?.entity_type) {
+      
+      // Pre-populate form data when modal opens with preSelectedEntity
+      if (preSelectedEntity) {
+        setFormData(prev => ({
+          ...prev,
+          entity_type: preSelectedEntity?.type || '',
+          entity_id: preSelectedEntity?.id || ''
+        }));
+        
+        // Load entities for the pre-selected type
+        if (preSelectedEntity?.type) {
+          loadEntities(preSelectedEntity?.type);
+        }
+      } else if (formData?.entity_type) {
         loadEntities(formData?.entity_type);
       }
     }
-  }, [isOpen, formData?.entity_type]);
+  }, [isOpen, preSelectedEntity]);
+
+  // FIXED: Add separate useEffect to load entities when entity_type changes
+  useEffect(() => {
+    if (formData?.entity_type) {
+      loadEntities(formData?.entity_type);
+    } else {
+      setEntities([]);
+    }
+  }, [formData?.entity_type]);
 
   const loadAssignees = async () => {
     try {
@@ -61,16 +83,20 @@ const CreateTaskModal = ({ isOpen, onClose, onTaskCreated, preSelectedEntity = n
       let data = [];
       switch (entityType) {
         case 'account':
-          data = await accountsService?.getAccounts();
+          const accountsResponse = await accountsService?.getAccounts();
+          data = accountsResponse?.data || accountsResponse || [];
           break;
         case 'property':
-          data = await propertiesService?.getProperties();
+          const propertiesResponse = await propertiesService?.getProperties();
+          data = propertiesResponse?.data || propertiesResponse || [];
           break;
         case 'contact':
-          data = await contactsService?.getContacts();
+          const contactsResponse = await contactsService?.getContacts();
+          data = contactsResponse?.data || contactsResponse || [];
           break;
         case 'opportunity':
-          data = await opportunitiesService?.getOpportunities();
+          const opportunitiesResponse = await opportunitiesService?.getOpportunities();
+          data = opportunitiesResponse?.data || opportunitiesResponse || [];
           break;
         default:
           break;
@@ -124,7 +150,6 @@ const CreateTaskModal = ({ isOpen, onClose, onTaskCreated, preSelectedEntity = n
     // Clear entity_id when entity_type changes
     if (field === 'entity_type' && value !== formData?.entity_type) {
       setFormData(prev => ({ ...prev, entity_id: '' }));
-      setEntities([]);
     }
   };
 
@@ -147,8 +172,11 @@ const CreateTaskModal = ({ isOpen, onClose, onTaskCreated, preSelectedEntity = n
         due_date: formData?.due_date || null,
         reminder_date: formData?.reminder_date || null,
         assigned_to: formData?.assigned_to,
-        assigned_by: '', // Will be set by the backend from auth.uid()
-        [`${formData?.entity_type}_id`]: formData?.entity_id || null
+        // Use the correct column name based on database schema
+        contact_id: formData?.entity_type === 'contact' ? formData?.entity_id : null,
+        account_id: formData?.entity_type === 'account' ? formData?.entity_id : null,
+        property_id: formData?.entity_type === 'property' ? formData?.entity_id : null,
+        opportunity_id: formData?.entity_type === 'opportunity' ? formData?.entity_id : null
       };
 
       const newTask = await tasksService?.createTask(taskData);
@@ -157,7 +185,7 @@ const CreateTaskModal = ({ isOpen, onClose, onTaskCreated, preSelectedEntity = n
       onClose();
       resetForm();
     } catch (err) {
-      setError(err?.message);
+      setError(err?.message || 'Failed to create task');
     } finally {
       setLoading(false);
     }
@@ -400,7 +428,9 @@ const CreateTaskModal = ({ isOpen, onClose, onTaskCreated, preSelectedEntity = n
                   Select {formData?.entity_type?.charAt(0)?.toUpperCase() + formData?.entity_type?.slice(1)}
                 </label>
                 <div className="relative">
-                  {getEntityIcon(formData?.entity_type)}
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                    {getEntityIcon(formData?.entity_type)}
+                  </div>
                   <select
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     value={formData?.entity_id}
@@ -418,6 +448,21 @@ const CreateTaskModal = ({ isOpen, onClose, onTaskCreated, preSelectedEntity = n
                     ))}
                   </select>
                 </div>
+                
+                {/* Show pre-selected entity info */}
+                {preSelectedEntity && formData?.entity_type === preSelectedEntity?.type && formData?.entity_id === preSelectedEntity?.id && (
+                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                    <div className="flex items-center text-sm text-blue-700">
+                      {getEntityIcon(preSelectedEntity?.type)}
+                      <span className="ml-2">
+                        Pre-selected: {preSelectedEntity?.contactName || preSelectedEntity?.accountName || 'Unknown'}
+                        {preSelectedEntity?.accountName && preSelectedEntity?.contactName && (
+                          <span className="text-blue-500"> from {preSelectedEntity?.accountName}</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
