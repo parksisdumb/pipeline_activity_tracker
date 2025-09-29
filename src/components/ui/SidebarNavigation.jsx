@@ -134,6 +134,13 @@ const SidebarNavigation = ({
       description: 'View assigned weekly goals'
     },
     { 
+      label: 'Prospects', 
+      path: '/prospects', 
+      icon: 'Search', 
+      roles: ['rep', 'manager'],
+      description: 'Hunt uncontacted ICP companies'
+    },
+    { 
       label: 'Accounts', 
       path: '/accounts', 
       icon: 'Building2', 

@@ -16,6 +16,11 @@ export const usersService = {
     }
   },
 
+  // Get all users - alias for getActiveUsers for backward compatibility
+  async getUsers() {
+    return this.getActiveUsers();
+  },
+
   // Get all active user profiles for dropdowns and filters
   async getActiveUsers() {
     try {
