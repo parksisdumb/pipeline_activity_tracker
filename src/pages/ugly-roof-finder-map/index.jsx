@@ -7,10 +7,43 @@ import LeadDrawer from './components/LeadDrawer';
 import FiltersBar from './components/FiltersBar';
 import roofLeadsService from '../../services/roofLeadsService';
 
+// Helper function to debounce bounds updates
+function useDebounced(value, ms) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedValue(value), ms);
+    return () => clearTimeout(timeout);
+  }, [value, ms]);
+  return debouncedValue;
+}
+
+// Helper function to convert geometry to point for markers
+const toPointGeometry = (geometry) => {
+  if (!geometry) return null;
+  if (geometry?.type === 'Point') return geometry;
+  
+  try {
+    // For polygons, calculate centroid manually
+    if (geometry?.type === 'Polygon') {
+      const ring = Array.isArray(geometry?.coordinates?.[0]) ? geometry?.coordinates?.[0] : [];
+      if (!ring?.length) return null;
+      
+      const [sx, sy] = ring?.reduce((acc, [x, y]) => [acc?.[0] + x, acc?.[1] + y], [0, 0]);
+      return { 
+        type: 'Point', 
+        coordinates: [sx / ring?.length, sy / ring?.length] 
+      };
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 export default function UglyRoofFinderMap() {
   const { user, userProfile } = useAuth();
   const [leads, setLeads] = useState([]);
-  const [filteredLeads, setFilteredLeads] = useState([]);
   const [selectedLead, setSelectedLead] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -23,13 +56,18 @@ export default function UglyRoofFinderMap() {
   });
   const [mapBounds, setMapBounds] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  
+  // Debounce bounds to prevent fetch spam
+  const debouncedBounds = useDebounced(mapBounds, 300);
 
   // Load leads based on current map bounds and filters
   const loadLeads = useCallback(async () => {
+    if (!debouncedBounds) return; // Skip if bounds is null
+    
     setLoading(true);
     try {
       const result = await roofLeadsService?.listLeads({
-        bbox: mapBounds,
+        bbox: debouncedBounds,
         search: filters?.search,
         status: filters?.status || undefined,
         tags: filters?.tags,
@@ -48,33 +86,16 @@ export default function UglyRoofFinderMap() {
     } finally {
       setLoading(false);
     }
-  }, [mapBounds, filters]);
+  }, [debouncedBounds, filters]);
 
-  // Apply client-side filtering for immediate UI response
-  const applyFilters = useCallback(() => {
-    let filtered = leads;
-
-    // Additional client-side filtering for immediate response
-    if (filters?.condition) {
-      filtered = filtered?.filter(lead => lead?.condition_label === filters?.condition);
-    }
-
-    setFilteredLeads(filtered);
-  }, [leads, filters]);
-
-  // Load leads when bounds or filters change
+  // Load leads when user, bounds or filters change
   useEffect(() => {
-    if (user) {
+    if (user && debouncedBounds) {
       loadLeads();
     }
-  }, [user, loadLeads]);
+  }, [user, debouncedBounds, filters, loadLeads]);
 
-  // Apply filters when leads or filters change
-  useEffect(() => {
-    applyFilters();
-  }, [applyFilters]);
-
-  // Handle map bounds change
+  // Handle map bounds change - called on moveend only
   const handleMapBoundsChange = useCallback((bounds) => {
     setMapBounds(bounds);
   }, []);
@@ -82,11 +103,10 @@ export default function UglyRoofFinderMap() {
   // Handle drawing completion (new lead creation)
   const handleDrawComplete = useCallback(async (geojson, drawingType) => {
     try {
-      // Create basic lead data structure
+      // Create basic lead data structure with correct key
       const leadData = {
         name: `New ${drawingType === 'point' ? 'Pin' : 'Area'} Lead`,
-        geojson: geojson,
-        condition_label: 'other',
+        geometry: geojson, // Fixed: use 'geometry'not 'geojson' condition_label:'other',
         condition_score: 1,
         tags: ['new'],
         notes: `Created via map drawing (${drawingType})`
@@ -95,18 +115,18 @@ export default function UglyRoofFinderMap() {
       const result = await roofLeadsService?.createLead(leadData);
       
       if (result?.success) {
-        // Reload leads to include new one
-        loadLeads();
+        // Optimistically add to leads list
+        const newLead = { id: result?.data?.id, ...leadData };
+        setLeads(prev => [newLead, ...prev]);
         
         // Open drawer with new lead
-        const newLeadResult = await roofLeadsService?.getLead(result?.data?.id);
-        if (newLeadResult?.success) {
-          setSelectedLead(newLeadResult?.data);
-          setIsDrawerOpen(true);
-        }
+        setSelectedLead(newLead);
+        setIsDrawerOpen(true);
+        
+        // Reconcile with server after a brief delay
+        setTimeout(() => loadLeads(), 250);
       } else {
         console.error('Failed to create lead:', result?.error);
-        // TODO: Show error notification
       }
     } catch (error) {
       console.error('Error creating lead:', error);
@@ -162,21 +182,26 @@ export default function UglyRoofFinderMap() {
 
   // Handle menu toggle for header
   const handleMenuToggle = useCallback(() => {
-    // Handle mobile menu toggle logic if needed
     console.log('Menu toggle clicked');
   }, []);
 
-  // Memoize map markers for performance
-  const mapMarkers = useMemo(() => 
-    filteredLeads?.map(lead => ({
-      id: lead?.id,
-      coordinates: lead?.coordinates,
-      condition_label: lead?.condition_label,
-      condition_score: lead?.condition_score,
-      name: lead?.name,
-      status: lead?.status
-    }))
-  , [filteredLeads]);
+  // Normalize markers with proper point geometry and remove client-side filtering
+  const mapMarkers = useMemo(() => {
+    return leads?.map(lead => {
+      const geom = lead?.geometry || lead?.geojson; // Unify backend shape
+      const point = toPointGeometry(geom);
+      if (!point) return null;
+      
+      return {
+        id: lead?.id,
+        geometry: point,
+        condition_label: lead?.condition_label,
+        condition_score: lead?.condition_score,
+        name: lead?.name,
+        status: lead?.status
+      };
+    })?.filter(Boolean);
+  }, [leads]);
 
   if (!user) {
     return (
@@ -199,7 +224,7 @@ export default function UglyRoofFinderMap() {
         <FiltersBar
           filters={filters}
           onFiltersChange={setFilters}
-          leadCount={filteredLeads?.length}
+          leadCount={leads?.length}
           loading={loading}
         />
 

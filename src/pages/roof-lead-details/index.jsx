@@ -118,12 +118,14 @@ export default function RoofLeadDetails() {
       const dueDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
       const result = await roofLeadsService?.createFollowUpTask(lead?.id, {
         dueDate,
-        priority: lead?.condition_score >= 4 ? 'high' : 'medium'
+        priority: lead?.condition_score >= 4 ? 'high' : 'medium',
+        title: `Follow-up: ${lead?.name}`,
+        notes: `From roof lead ${lead?.name} at ${lead?.address || ''}`
       });
       
       if (result?.success) {
         // Navigate to task management or show success
-        navigate('/tasks');
+        navigate('/task-management');
       }
     } catch (error) {
       console.error('Error creating follow-up task:', error);
@@ -384,6 +386,22 @@ export default function RoofLeadDetails() {
                     />
                   </div>
                 </div>
+
+                {/* Mini Static Map Preview (Optional Enhancement) */}
+                {lead?.coordinates && (
+                  <div className="bg-white shadow rounded-lg overflow-hidden">
+                    <div className="px-4 py-5 sm:p-6">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        Location Preview
+                      </h3>
+                      <div className="w-full h-48 bg-gray-100 rounded-md flex items-center justify-center">
+                        <p className="text-sm text-gray-500">
+                          Interactive map preview coming soon
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Sidebar */}

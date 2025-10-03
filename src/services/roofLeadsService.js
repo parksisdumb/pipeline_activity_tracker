@@ -133,7 +133,7 @@ const roofLeadsService = {
     try {
       const {
         name,
-        geojson,
+        geometry, // Fixed: renamed from geojson
         condition_label = 'other',
         condition_score = 1,
         tags = [],
@@ -153,7 +153,7 @@ const roofLeadsService = {
         };
       }
 
-      if (!geojson) {
+      if (!geometry) {
         return {
           success: false,
           error: 'Geometry data is required'
@@ -163,7 +163,7 @@ const roofLeadsService = {
       // Use the PostGIS function to create the lead
       const { data, error } = await supabase?.rpc('create_roof_lead_with_geojson', {
           p_name: name?.trim(),
-          p_geojson: geojson,
+          p_geojson: geometry, // Use geometry parameter
           p_condition_label: condition_label,
           p_condition_score: condition_score,
           p_tags: tags,
@@ -594,12 +594,12 @@ const roofLeadsService = {
 
       const lead = leadResult?.data;
 
-      // Create task data
+      // Create task data with enhanced title and description
       const newTaskData = {
-        title: `Follow up on roof lead: ${lead?.name}`,
-        description: `Follow up on roof lead with ${lead?.condition_label} condition (score: ${lead?.condition_score}). ${notes}`?.trim(),
+        title: `Follow-up: ${lead?.name}`,
+        description: `From roof lead ${lead?.name} at ${lead?.address || ''}. Follow up on roof lead with ${lead?.condition_label} condition (score: ${lead?.condition_score}). ${notes}`?.trim(),
         due_date: dueDate,
-        priority: priority,
+        priority: lead?.condition_score >= 4 ? 'high' : priority,
         category: 'follow_up_call',
         status: 'pending',
         // Link to related entities

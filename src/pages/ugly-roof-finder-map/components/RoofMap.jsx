@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Map, Layer, Source, NavigationControl, GeolocateControl, ScaleControl } from 'react-map-gl';
 import { MapPin, Square } from 'lucide-react';
 import Button from '../../../components/ui/Button';
+import maplibregl from 'maplibre-gl';
 
-// MapLibre GL JS styles - Updated import path for better compatibility
+// MapLibre GL JS styles - Static import for race safety
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 export default function RoofMap({ leads = [], onBoundsChange, onDrawComplete, onLeadSelect, loading = false }) {
@@ -43,36 +44,45 @@ export default function RoofMap({ leads = [], onBoundsChange, onDrawComplete, on
     };
   }, []);
 
-  // Handle map bounds change
-  const handleMove = useCallback((evt) => {
-    const { viewState: newViewState } = evt;
-    setViewState(newViewState);
+  // Set bounds change to moveend only (no spam)
+  useEffect(() => {
+    const map = mapRef?.current?.getMap?.();
+    if (!map || !onBoundsChange) return;
     
-    // Get visible bounds and notify parent
-    try {
-      const map = mapRef?.current?.getMap?.();
-      if (map && onBoundsChange && typeof map?.getBounds === 'function') {
-        const bounds = map?.getBounds();
-        if (bounds && typeof bounds?.toArray === 'function') {
-          const boundsArray = bounds?.toArray();
-          const bbox = [
-            boundsArray?.[0]?.[0], // west
-            boundsArray?.[0]?.[1], // south
-            boundsArray?.[1]?.[0], // east
-            boundsArray?.[1]?.[1]  // north
-          ];
-          onBoundsChange(bbox);
-        }
-      }
-    } catch (error) {
-      console.warn('Error getting map bounds:', error);
-    }
+    const handler = () => {
+      const b = map?.getBounds()?.toArray();
+      if (!b) return;
+      onBoundsChange([b?.[0]?.[0], b?.[0]?.[1], b?.[1]?.[0], b?.[1]?.[1]]);
+    };
+    
+    map?.on('moveend', handler);
+    return () => map?.off('moveend', handler);
   }, [onBoundsChange]);
 
-  // Handle map clicks for drawing
+  // Handle map clicks for drawing and marker selection
   const handleMapClick = useCallback((event) => {
-    if (!drawingMode || !event?.lngLat) return;
+    if (!event) return;
 
+    // Check for cluster clicks first (zoom in)
+    const cluster = event?.features?.find(f => f?.layer?.id === 'clusters');
+    if (cluster) {
+      const map = mapRef?.current?.getMap?.();
+      const [lng, lat] = cluster?.geometry?.coordinates || [];
+      if (map && lng != null && lat != null) {
+        map?.easeTo({ center: [lng, lat], zoom: viewState?.zoom + 1 });
+      }
+      return;
+    }
+
+    // Check for marker clicks (lead selection)
+    const feat = event?.features?.find(f => f?.layer?.id === 'lead-markers');
+    if (feat?.properties?.id && !drawingMode) {
+      onLeadSelect?.(feat?.properties?.id);
+      return;
+    }
+
+    // Drawing logic
+    if (!drawingMode || !event?.lngLat) return;
     const { lng, lat } = event?.lngLat;
 
     if (drawingMode === 'point') {
@@ -96,31 +106,25 @@ export default function RoofMap({ leads = [], onBoundsChange, onDrawComplete, on
         // Add point to polygon
         const newPoints = [...drawingPoints, newPoint];
         setDrawingPoints(newPoints);
-        
-        // Close polygon with double-click or when clicking near start point
-        if (newPoints?.length >= 3) {
-          const firstPoint = newPoints?.[0];
-          const distance = Math.sqrt(
-            Math.pow(lng - firstPoint?.[0], 2) + Math.pow(lat - firstPoint?.[1], 2)
-          );
-          
-          // Close polygon if clicked near start (within 0.001 degrees)
-          if (distance < 0.001) {
-            const closedPoints = [...newPoints, firstPoint];
-            const polygonGeometry = {
-              type: 'Polygon',
-              coordinates: [closedPoints]
-            };
-            
-            onDrawComplete?.(polygonGeometry, 'polygon');
-            setDrawingMode(null);
-            setDrawingPoints([]);
-            setIsDrawing(false);
-          }
-        }
       }
     }
-  }, [drawingMode, drawingPoints, isDrawing, onDrawComplete]);
+  }, [drawingMode, drawingPoints, isDrawing, onDrawComplete, onLeadSelect, viewState?.zoom]);
+
+  // Finish polygon drawing
+  const finishPolygon = useCallback(() => {
+    if (drawingPoints?.length >= 3) {
+      const closedPoints = [...drawingPoints, drawingPoints?.[0]];
+      const polygonGeometry = {
+        type: 'Polygon',
+        coordinates: [closedPoints]
+      };
+      
+      onDrawComplete?.(polygonGeometry, 'polygon');
+      setDrawingPoints([]);
+      setIsDrawing(false);
+      setDrawingMode(null);
+    }
+  }, [drawingPoints, onDrawComplete]);
 
   // Cancel drawing
   const cancelDrawing = useCallback(() => {
@@ -135,17 +139,10 @@ export default function RoofMap({ leads = [], onBoundsChange, onDrawComplete, on
     setDrawingMode(mode);
   }, [cancelDrawing]);
 
-  // Handle marker clicks
-  const handleMarkerClick = useCallback((leadId) => {
-    if (!drawingMode) {
-      onLeadSelect?.(leadId);
-    }
-  }, [drawingMode, onLeadSelect]);
-
-  // Create GeoJSON for lead markers
+  // Create GeoJSON for lead markers with clustering
   const leadMarkersGeoJSON = useMemo(() => ({
     type: 'FeatureCollection',
-    features: leads?.filter(lead => lead?.coordinates)?.map(lead => ({
+    features: leads?.map(lead => ({
       type: 'Feature',
       properties: {
         id: lead?.id,
@@ -154,7 +151,7 @@ export default function RoofMap({ leads = [], onBoundsChange, onDrawComplete, on
         condition_score: lead?.condition_score || 1,
         status: lead?.status || 'new'
       },
-      geometry: lead?.coordinates
+      geometry: lead?.geometry
     })) || []
   }), [leads]);
 
@@ -190,16 +187,28 @@ export default function RoofMap({ leads = [], onBoundsChange, onDrawComplete, on
     }
   }, [drawingMode, cancelDrawing]);
 
-  // Handle marker layer clicks
-  const handleMarkerLayerClick = useCallback((event) => {
-    const feature = event?.features?.[0];
-    if (feature?.properties?.id && !drawingMode) {
-      handleMarkerClick(feature?.properties?.id);
+  // Handle double-click to finish polygon
+  const handleMapDoubleClick = useCallback((event) => {
+    if (drawingMode === 'polygon' && isDrawing) {
+      event?.preventDefault();
+      finishPolygon();
     }
-  }, [drawingMode, handleMarkerClick]);
+  }, [drawingMode, isDrawing, finishPolygon]);
 
   return (
     <div className="relative w-full h-full">
+      {/* Loading/Empty States */}
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <div className="bg-white/70 rounded px-3 py-2 text-sm">Loading map data…</div>
+        </div>
+      )}
+      {!loading && leads?.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <div className="bg-white/70 rounded px-3 py-2 text-sm">No leads in this view</div>
+        </div>
+      )}
+
       {/* Drawing Instructions */}
       {drawingMode && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 bg-white rounded-lg shadow-lg px-4 py-2">
@@ -207,7 +216,7 @@ export default function RoofMap({ leads = [], onBoundsChange, onDrawComplete, on
             {drawingMode === 'point' && 'Click on the map to drop a pin'}
             {drawingMode === 'polygon' && (
               <>
-                {!isDrawing ? 'Click to start drawing area' : 'Click to add points, click near start to finish'}
+                {!isDrawing ? 'Click to start drawing area' : 'Click to add points, double-click or use Finish button to complete'}
               </>
             )}
           </div>
@@ -218,6 +227,17 @@ export default function RoofMap({ leads = [], onBoundsChange, onDrawComplete, on
             Press ESC to cancel
           </button>
         </div>
+      )}
+
+      {/* Finish Area Button */}
+      {drawingMode === 'polygon' && isDrawing && (
+        <Button 
+          size="xs" 
+          className="absolute top-4 left-1/2 -translate-x-1/2 z-10" 
+          onClick={finishPolygon}
+        >
+          Finish Area
+        </Button>
       )}
 
       {/* Drawing Tools */}
@@ -242,35 +262,61 @@ export default function RoofMap({ leads = [], onBoundsChange, onDrawComplete, on
         </Button>
       </div>
 
-      {/* Lead Count Badge */}
-      <div className="absolute bottom-4 left-4 z-10 bg-white rounded-lg shadow-lg px-3 py-2">
-        <div className="text-sm font-medium text-gray-900">
-          {loading ? 'Loading...' : `${leads?.length || 0} roof leads`}
-        </div>
-      </div>
-
       {/* Map */}
       <Map
         ref={mapRef}
         {...viewState}
-        onMove={handleMove}
+        onMove={({ viewState: newViewState }) => setViewState(newViewState)}
         onClick={handleMapClick}
+        onDblClick={handleMapDoubleClick}
         style={{ width: '100%', height: '100%' }}
         mapStyle={mapStyle}
-        mapLib={import('maplibre-gl')}
-        interactiveLayerIds={['lead-markers']}
+        mapLib={maplibregl}
+        interactiveLayerIds={['clusters', 'lead-markers']}
       >
         {/* Map Controls */}
         <NavigationControl position="top-left" />
         <GeolocateControl position="top-left" />
         <ScaleControl position="bottom-right" />
 
-        {/* Lead Markers */}
+        {/* Lead Markers with Clustering */}
         {leadMarkersGeoJSON?.features?.length > 0 && (
-          <Source id="lead-markers" type="geojson" data={leadMarkersGeoJSON}>
+          <Source 
+            id="lead-markers" 
+            type="geojson" 
+            data={leadMarkersGeoJSON}
+            cluster
+            clusterRadius={50}
+            clusterMaxZoom={14}
+          >
+            {/* Clusters */}
+            <Layer
+              id="clusters"
+              type="circle"
+              filter={['has', 'point_count']}
+              paint={{
+                'circle-color': '#93C5FD',
+                'circle-radius': ['step', ['get', 'point_count'], 15, 50, 20, 100, 25]
+              }}
+            />
+            
+            {/* Cluster Count */}
+            <Layer
+              id="cluster-count"
+              type="symbol"
+              filter={['has', 'point_count']}
+              layout={{ 
+                'text-field': '{point_count_abbreviated}', 
+                'text-size': 12 
+              }}
+              paint={{ 'text-color': '#1F2937' }}
+            />
+            
+            {/* Individual Markers */}
             <Layer
               id="lead-markers"
               type="circle"
+              filter={['!', ['has', 'point_count']]}
               paint={{
                 'circle-radius': [
                   'interpolate',
@@ -290,7 +336,6 @@ export default function RoofMap({ leads = [], onBoundsChange, onDrawComplete, on
                 'circle-stroke-color': '#FFFFFF',
                 'circle-opacity': 0.8
               }}
-              onClick={handleMarkerLayerClick}
             />
           </Source>
         )}
