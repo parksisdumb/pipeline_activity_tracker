@@ -138,7 +138,7 @@ const YourTasks = ({ className = '', onCreateTask }) => {
       onCreateTask();
     } else {
       // Fallback to navigation if onCreateTask prop is not provided
-      navigate('/task-management');
+      navigate('/tasks');
     }
   };
 
@@ -258,7 +258,7 @@ const YourTasks = ({ className = '', onCreateTask }) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate('/task-management')}
+              onClick={() => navigate('/tasks')}
               className="flex items-center space-x-2"
             >
               <Eye className="w-4 h-4" />
@@ -452,7 +452,7 @@ const YourTasks = ({ className = '', onCreateTask }) => {
           <div className="mt-6 text-center">
             <Button
               variant="outline"
-              onClick={() => navigate('/task-management')}
+              onClick={() => navigate('/tasks')}
               className="w-full"
             >
               View All Tasks

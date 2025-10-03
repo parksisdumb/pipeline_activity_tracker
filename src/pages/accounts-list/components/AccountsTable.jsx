@@ -83,6 +83,20 @@ export function AccountsTable({
   const isManager = currentUser?.role === 'manager';
   const canManageAssignments = isManager || currentUser?.role === 'admin';
 
+  const handleLogActivity = (account, e) => {
+    e?.stopPropagation(); // Prevent row click
+    navigate('/log-activity', {
+      state: {
+        preselected: true,
+        account: {
+          value: account?.id,
+          label: account?.name,
+          description: account?.company_type || 'Account'
+        }
+      }
+    });
+  };
+
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
       {/* Desktop Table View */}
@@ -142,7 +156,7 @@ export function AccountsTable({
                   {getSortIcon('lastActivity')}
                 </button>
               </th>
-              <th className="w-20 px-4 py-3 text-center text-sm font-medium text-muted-foreground">
+              <th className="w-32 px-4 py-3 text-center text-sm font-medium text-muted-foreground">
                 Actions
               </th>
             </tr>
@@ -195,14 +209,24 @@ export function AccountsTable({
                   <span className="text-sm text-muted-foreground">{formatDate(account?.lastActivity)}</span>
                 </td>
                 <td className="px-4 py-3" onClick={(e) => e?.stopPropagation()}>
-                  <div className="flex items-center justify-center">
+                  <div className="flex items-center justify-center space-x-1">
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handleRowClick(account?.id)}
                       className="w-8 h-8"
+                      title="View Details"
                     >
                       <Icon name="ExternalLink" size={14} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => handleLogActivity(account, e)}
+                      className="w-8 h-8"
+                      title="Log Activity"
+                    >
+                      <Icon name="Plus" size={14} />
                     </Button>
                   </div>
                 </td>
@@ -235,17 +259,26 @@ export function AccountsTable({
                   <p className="text-xs text-muted-foreground">{account?.companyType}</p>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e?.stopPropagation();
-                  handleRowClick(account?.id);
-                }}
-                className="w-8 h-8 flex-shrink-0"
-              >
-                <Icon name="ExternalLink" size={14} />
-              </Button>
+              <div className="flex items-center space-x-1" onClick={(e) => e?.stopPropagation()}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleRowClick(account?.id)}
+                  className="w-8 h-8 flex-shrink-0"
+                  title="View Details"
+                >
+                  <Icon name="ExternalLink" size={14} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => handleLogActivity(account, e)}
+                  className="w-8 h-8 flex-shrink-0"
+                  title="Log Activity"
+                >
+                  <Icon name="Plus" size={14} />
+                </Button>
+              </div>
             </div>
             
             <div className="flex items-center justify-between">

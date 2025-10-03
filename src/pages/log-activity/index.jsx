@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import Header from '../../components/ui/Header';
 import SidebarNavigation from '../../components/ui/SidebarNavigation';
@@ -18,6 +18,7 @@ import { activitiesService } from '../../services/activitiesService';
 const LogActivity = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth(); // Add auth context
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,87 +52,141 @@ const LogActivity = () => {
 
   const watchedValues = watch();
 
-  // Pre-populate form if coming from another page with context
+  // Pre-populate form if coming from another page with context OR URL query params
   useEffect(() => {
-    const state = location?.state;
-    if (state?.preselected) {
-      if (state?.account) {
-        setValue('account', state?.account?.value);
-        setSelectedEntities(prev => ({ ...prev, account: state?.account }));
-      }
-      if (state?.property) {
-        setValue('property', state?.property?.value);
-        setSelectedEntities(prev => ({ ...prev, property: state?.property }));
-      }
-      if (state?.contact) {
-        setValue('contact', state?.contact?.value);
-        setSelectedEntities(prev => ({ ...prev, contact: state?.contact }));
-      }
-      // Handle opportunity pre-filling
-      if (state?.opportunity) {
-        setValue('opportunity', state?.opportunity?.value);
-        setSelectedEntities(prev => ({ ...prev, opportunity: state?.opportunity }));
-      }
-      if (state?.activityType) {
-        setValue('activityType', state?.activityType);
-      }
-    }
-    // Also handle legacy format for backward compatibility
-    else if (state?.contactId && state?.accountId) {
-      setValue('account', state?.accountId);
-      setValue('contact', state?.contactId);
-      setSelectedEntities(prev => ({ 
-        ...prev, 
-        account: {
-          value: state?.accountId,
-          label: state?.accountName || 'Account',
-          description: 'Account'
-        },
-        contact: {
-          value: state?.contactId,
-          label: state?.contactName || 'Contact',
-          description: 'Contact'
+    const handleAccountPrePopulation = async () => {
+      // First, check location.state for existing logic (backward compatibility)
+      const state = location?.state;
+      if (state?.preselected) {
+        if (state?.account) {
+          setValue('account', state?.account?.value);
+          setSelectedEntities(prev => ({ ...prev, account: state?.account }));
         }
-      }));
-    }
-    // Handle opportunity-specific context
-    else if (state?.opportunityId) {
-      setValue('opportunity', state?.opportunityId);
-      setSelectedEntities(prev => ({
-        ...prev,
-        opportunity: {
-          value: state?.opportunityId,
-          label: state?.opportunityName || 'Opportunity',
-          description: 'Opportunity'
+        if (state?.property) {
+          setValue('property', state?.property?.value);
+          setSelectedEntities(prev => ({ ...prev, property: state?.property }));
         }
-      }));
-      
-      // Also pre-fill related account/property if available
-      if (state?.accountId) {
+        if (state?.contact) {
+          setValue('contact', state?.contact?.value);
+          setSelectedEntities(prev => ({ ...prev, contact: state?.contact }));
+        }
+        if (state?.opportunity) {
+          setValue('opportunity', state?.opportunity?.value);
+          setSelectedEntities(prev => ({ ...prev, opportunity: state?.opportunity }));
+        }
+        if (state?.activityType) {
+          setValue('activityType', state?.activityType);
+        }
+        return; // Exit early if state-based pre-population worked
+      }
+      // Also handle legacy format for backward compatibility
+      else if (state?.contactId && state?.accountId) {
         setValue('account', state?.accountId);
-        setSelectedEntities(prev => ({
-          ...prev,
+        setValue('contact', state?.contactId);
+        setSelectedEntities(prev => ({ 
+          ...prev, 
           account: {
             value: state?.accountId,
             label: state?.accountName || 'Account',
             description: 'Account'
+          },
+          contact: {
+            value: state?.contactId,
+            label: state?.contactName || 'Contact',
+            description: 'Contact'
           }
         }));
+        return;
       }
-      
-      if (state?.propertyId) {
-        setValue('property', state?.propertyId);
+      // Handle opportunity-specific context
+      else if (state?.opportunityId) {
+        setValue('opportunity', state?.opportunityId);
         setSelectedEntities(prev => ({
           ...prev,
-          property: {
-            value: state?.propertyId,
-            label: state?.propertyName || 'Property',
-            description: 'Property'
+          opportunity: {
+            value: state?.opportunityId,
+            label: state?.opportunityName || 'Opportunity',
+            description: 'Opportunity'
           }
         }));
+        
+        if (state?.accountId) {
+          setValue('account', state?.accountId);
+          setSelectedEntities(prev => ({
+            ...prev,
+            account: {
+              value: state?.accountId,
+              label: state?.accountName || 'Account',
+              description: 'Account'
+            }
+          }));
+        }
+        
+        if (state?.propertyId) {
+          setValue('property', state?.propertyId);
+          setSelectedEntities(prev => ({
+            ...prev,
+            property: {
+              value: state?.propertyId,
+              label: state?.propertyName || 'Property',
+              description: 'Property'
+            }
+          }));
+        }
+        return;
       }
-    }
-  }, [location?.state, setValue]);
+
+      // NEW: Check URL query parameters for account auto-population
+      const accountIdFromUrl = searchParams?.get('accountId');
+      const propertyIdFromUrl = searchParams?.get('propertyId');
+      const contactIdFromUrl = searchParams?.get('contactId');
+      const opportunityIdFromUrl = searchParams?.get('opportunityId');
+      
+      // If accountId is in URL, fetch account details and pre-populate
+      if (accountIdFromUrl && user) {
+        try {
+          // Import accountsService at the top if not already imported
+          const { accountsService } = await import('../../services/accountsService');
+          const result = await accountsService?.getAccount(accountIdFromUrl);
+          
+          if (result?.success && result?.data) {
+            const account = result?.data;
+            setValue('account', account?.id);
+            setSelectedEntities(prev => ({
+              ...prev,
+              account: {
+                value: account?.id,
+                label: account?.name,
+                description: account?.company_type || 'Account'
+              }
+            }));
+            
+            console.log('Account auto-populated from URL:', account?.name);
+          }
+        } catch (error) {
+          console.error('Error fetching account for pre-population:', error);
+        }
+      }
+
+      // Pre-populate other entities if provided in URL
+      if (propertyIdFromUrl) {
+        setValue('property', propertyIdFromUrl);
+        // Could fetch property details here too if needed
+      }
+      
+      if (contactIdFromUrl) {
+        setValue('contact', contactIdFromUrl);
+        // Could fetch contact details here too if needed
+      }
+      
+      if (opportunityIdFromUrl) {
+        setValue('opportunity', opportunityIdFromUrl);
+        // Could fetch opportunity details here too if needed
+      }
+    };
+
+    handleAccountPrePopulation();
+  }, [location?.state, searchParams, setValue, user]);
 
   const handleEntitySelect = (entityType, value) => {
     setValue(entityType, value);

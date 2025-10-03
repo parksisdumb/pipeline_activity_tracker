@@ -42,10 +42,6 @@ import CreateTaskModal from './pages/create-task-modal';
 import ConvertProspectModal from './pages/convert-prospect-modal';
 import DocumentsPage from './pages/documents';
 import UploadDocumentModal from './pages/upload-document-modal';
-// Import Roof Finder page
-import UglyRoofFinderMap from './pages/ugly-roof-finder-map';
-// Import new Lead Conversion Workflow page
-import LeadConversionWorkflow from './pages/lead-conversion-workflow';
 import NotFound from './pages/NotFound';
 
 const Routes = () => {
@@ -101,12 +97,6 @@ const Routes = () => {
             
             {/* Documents Module */}
             <Route path="/documents" element={<DocumentsPage />} />
-            
-            {/* Roof Finder */}
-            <Route path="/roof-finder" element={<UglyRoofFinderMap />} />
-            
-            {/* Lead Conversion Workflow */}
-            <Route path="/lead-conversion-workflow" element={<LeadConversionWorkflow />} />
             
             {/* Profile */}
             <Route path="/profile" element={<Profile />} />

@@ -170,13 +170,6 @@ const SidebarNavigation = ({
       description: 'Sales opportunity management'
     },
     { 
-      label: 'Roof Finder', 
-      path: '/roof-finder', 
-      icon: 'Map', 
-      roles: ['rep', 'manager'],
-      description: 'Map-based prospecting tool for ugly roofs'
-    },
-    { 
       label: 'Documents', 
       path: '/documents', 
       icon: 'FileText', 
