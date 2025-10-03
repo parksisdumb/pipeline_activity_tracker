@@ -215,9 +215,9 @@ const WeeklyGoals = () => {
         if (activitiesResult?.success) {
           const activities = activitiesResult?.data || [];
           performanceData[member?.id] = {
-            pop_ins: activities?.filter(a => a?.activity_type === 'Site Visit')?.length || 0,
-            dm_conversations: activities?.filter(a => a?.activity_type === 'Phone Call')?.length || 0,
-            assessments_booked: activities?.filter(a => a?.activity_type === 'Assessment')?.length || 0,
+            pop_ins: activities?.filter(a => a?.activity_type === 'Pop-in')?.length || 0,
+            dm_conversations: activities?.filter(a => a?.activity_type === 'Decision Maker Conversation')?.length || 0,
+            assessments_booked: activities?.filter(a => a?.activity_outcome === 'Assessment Completed')?.length || 0,
             proposals_sent: activities?.filter(a => a?.activity_type === 'Proposal Sent')?.length || 0,
             wins: activities?.filter(a => a?.activity_type === 'Contract Signed')?.length || 0
           };
@@ -244,9 +244,9 @@ const WeeklyGoals = () => {
         if (previousActivitiesResult?.success) {
           const prevActivities = previousActivitiesResult?.data || [];
           previousPerformanceData[member?.id] = {
-            pop_ins: prevActivities?.filter(a => a?.activity_type === 'Site Visit')?.length || 0,
-            dm_conversations: prevActivities?.filter(a => a?.activity_type === 'Phone Call')?.length || 0,
-            assessments_booked: prevActivities?.filter(a => a?.activity_type === 'Assessment')?.length || 0,
+            pop_ins: prevActivities?.filter(a => a?.activity_type === 'Pop-in')?.length || 0,
+            dm_conversations: prevActivities?.filter(a => a?.activity_type === 'Decision Maker Conversation')?.length || 0,
+            assessments_booked: prevActivities?.filter(a => a?.activity_outcome === 'Assessment Completed')?.length || 0,
             proposals_sent: prevActivities?.filter(a => a?.activity_type === 'Proposal Sent')?.length || 0,
             wins: prevActivities?.filter(a => a?.activity_type === 'Contract Signed')?.length || 0
           };

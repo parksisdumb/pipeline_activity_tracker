@@ -30,6 +30,17 @@ const QuickActions = ({ className = '' }) => {
     setShowAddPropertyModal(false);
   };
 
+  const handleViewAccounts = (e) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    console.log('Navigating to accounts page...');
+    try {
+      navigate('/accounts');
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  };
+
   const quickActions = [
     {
       id: 1,
@@ -72,7 +83,7 @@ const QuickActions = ({ className = '' }) => {
       label: "View Accounts",
       description: "Browse all accounts",
       icon: "Search",
-      action: () => navigate('/accounts-list'),
+      action: handleViewAccounts,
       color: "text-orange-600 bg-orange-100"
     }
   ];

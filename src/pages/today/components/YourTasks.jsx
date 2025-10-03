@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Clock, AlertCircle, Plus, Eye, Trash2 } from 'lucide-react';
+import { CheckCircle, Clock, AlertCircle, Plus, Eye, Trash2, Calendar, Target } from 'lucide-react';
 import { tasksService } from '../../../services/tasksService';
 import { useAuth } from '../../../contexts/AuthContext';
 import Button from '../../../components/ui/Button';
@@ -12,8 +12,13 @@ const YourTasks = ({ className = '', onCreateTask }) => {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
   const [error, setError] = useState(null);
+  const [taskCounts, setTaskCounts] = useState({
+    overdue: 0,
+    dueToday: 0,
+    upcoming: 0
+  });
 
-  // Load tasks for current user
+  // Enhanced task loading with priority sorting
   const loadTasks = async () => {
     if (!user?.id) return;
 
@@ -21,11 +26,68 @@ const YourTasks = ({ className = '', onCreateTask }) => {
       setLoading(true);
       setError(null);
       const data = await tasksService?.getTasksWithDetails(user?.id, null, null);
+      
       // Filter to show only pending and in_progress tasks for Today view
       const activeTasks = (data || [])?.filter(task => 
         task?.status === 'pending' || task?.status === 'in_progress'
       );
-      setTasks(activeTasks?.slice(0, 5) || []); // Show max 5 tasks for Today view
+
+      // Sort tasks by: overdue → due today → due in 3 days, then by priority
+      const sortedTasks = activeTasks?.sort((a, b) => {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const threeDaysFromNow = new Date(today);
+        threeDaysFromNow?.setDate(today?.getDate() + 3);
+
+        const aDue = a?.due_date ? new Date(a.due_date) : null;
+        const bDue = b?.due_date ? new Date(b.due_date) : null;
+
+        // Priority weights
+        const priorityWeight = { urgent: 4, high: 3, medium: 2, low: 1 };
+        const aPriority = priorityWeight?.[a?.priority] || 2;
+        const bPriority = priorityWeight?.[b?.priority] || 2;
+
+        // Categorize tasks by due date
+        const getDateCategory = (dueDate) => {
+          if (!dueDate) return 4; // No due date = lowest priority
+          if (dueDate < today) return 1; // Overdue
+          if (dueDate?.toDateString() === today?.toDateString()) return 2; // Due today
+          if (dueDate <= threeDaysFromNow) return 3; // Upcoming (3 days)
+          return 4; // Future
+        };
+
+        const aCategory = getDateCategory(aDue);
+        const bCategory = getDateCategory(bDue);
+
+        // Sort by category first, then priority
+        if (aCategory !== bCategory) {
+          return aCategory - bCategory;
+        }
+        return bPriority - aPriority; // Higher priority first within same category
+      });
+
+      // Calculate task counts for badges
+      const counts = { overdue: 0, dueToday: 0, upcoming: 0 };
+      const today = new Date();
+      const todayStr = today?.toDateString();
+      const threeDaysFromNow = new Date(today);
+      threeDaysFromNow?.setDate(today?.getDate() + 3);
+
+      activeTasks?.forEach(task => {
+        if (task?.due_date) {
+          const dueDate = new Date(task.due_date);
+          if (dueDate < today) {
+            counts.overdue++;
+          } else if (dueDate?.toDateString() === todayStr) {
+            counts.dueToday++;
+          } else if (dueDate <= threeDaysFromNow) {
+            counts.upcoming++;
+          }
+        }
+      });
+
+      setTaskCounts(counts);
+      setTasks(sortedTasks?.slice(0, 5) || []); // Show max 5 tasks for Today view
     } catch (err) {
       console.error('Failed to load tasks:', err);
       setError('Unable to load your tasks. Please check your connection.');
@@ -80,55 +142,80 @@ const YourTasks = ({ className = '', onCreateTask }) => {
     }
   };
 
-  // Get priority badge styling
+  // Enhanced priority styling
   const getPriorityStyle = (priority) => {
     switch (priority) {
       case 'urgent':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-100 text-red-800 border-red-300 shadow-sm';
       case 'high':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
+        return 'bg-orange-100 text-orange-800 border-orange-300 shadow-sm';
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300 shadow-sm';
       case 'low':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 text-green-800 border-green-300 shadow-sm';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 text-gray-800 border-gray-300 shadow-sm';
     }
   };
 
-  // Get status icon
+  // Enhanced status icon with animations
   const getStatusIcon = (status) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
+        return <CheckCircle className="w-4 h-4 text-green-600 animate-pulse" />;
       case 'in_progress':
-        return <Clock className="w-4 h-4 text-blue-600" />;
+        return <Clock className="w-4 h-4 text-blue-600 animate-spin" style={{animationDuration: '3s'}} />;
       case 'overdue':
-        return <AlertCircle className="w-4 h-4 text-red-600" />;
+        return <AlertCircle className="w-4 h-4 text-red-600 animate-bounce" />;
       default:
         return <Clock className="w-4 h-4 text-gray-400" />;
     }
   };
 
-  // Format due date
+  // Enhanced due date formatting with badges
   const formatDueDate = (dueDate) => {
     if (!dueDate) return null;
     
     const date = new Date(dueDate);
     const now = new Date();
-    const diffTime = date - now;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffTime = date - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays < 0) {
-      return <span className="text-red-600 font-medium">Overdue</span>;
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200 animate-pulse">
+          <AlertCircle className="w-3 h-3 mr-1" />
+          Overdue
+        </span>
+      );
     } else if (diffDays === 0) {
-      return <span className="text-orange-600 font-medium">Due today</span>;
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+          <Target className="w-3 h-3 mr-1" />
+          Due Today
+        </span>
+      );
     } else if (diffDays === 1) {
-      return <span className="text-yellow-600">Due tomorrow</span>;
-    } else if (diffDays <= 7) {
-      return <span className="text-blue-600">Due in {diffDays} days</span>;
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+          <Calendar className="w-3 h-3 mr-1" />
+          Tomorrow
+        </span>
+      );
+    } else if (diffDays <= 3) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+          <Calendar className="w-3 h-3 mr-1" />
+          {diffDays} days
+        </span>
+      );
     } else {
-      return <span className="text-gray-600">Due {date?.toLocaleDateString()}</span>;
+      return (
+        <span className="text-xs text-gray-600">
+          {date?.toLocaleDateString()}
+        </span>
+      );
     }
   };
 
@@ -149,13 +236,13 @@ const YourTasks = ({ className = '', onCreateTask }) => {
 
   return (
     <div className={`bg-card rounded-lg border border-border ${className}`}>
-      {/* Header */}
+      {/* Enhanced Header with Task Count Badges */}
       <div className="p-6 border-b border-border">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-lg font-semibold text-foreground">Your Tasks</h3>
             <p className="text-sm text-muted-foreground mt-1">
-              Active tasks assigned to you
+              Prioritized by urgency and importance
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -179,8 +266,29 @@ const YourTasks = ({ className = '', onCreateTask }) => {
             </Button>
           </div>
         </div>
-      </div>
 
+        {/* Task Count Badges */}
+        <div className="flex items-center space-x-4">
+          {taskCounts?.overdue > 0 && (
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 border border-red-200">
+              <AlertCircle className="w-4 h-4 mr-1" />
+              {taskCounts?.overdue} Overdue
+            </div>
+          )}
+          {taskCounts?.dueToday > 0 && (
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800 border border-orange-200">
+              <Target className="w-4 h-4 mr-1" />
+              {taskCounts?.dueToday} Due Today
+            </div>
+          )}
+          {taskCounts?.upcoming > 0 && (
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200">
+              <Calendar className="w-4 h-4 mr-1" />
+              {taskCounts?.upcoming} Upcoming
+            </div>
+          )}
+        </div>
+      </div>
       {/* Content */}
       <div className="p-6">
         {/* Error Message */}
@@ -210,15 +318,15 @@ const YourTasks = ({ className = '', onCreateTask }) => {
           </div>
         )}
 
-        {/* Empty State */}
+        {/* Enhanced Empty State */}
         {!loading && !error && tasks?.length === 0 && (
           <div className="text-center py-8">
-            <CheckCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4 animate-bounce" />
             <h4 className="text-lg font-medium text-foreground mb-2">
               All caught up! 🎉
             </h4>
             <p className="text-sm text-muted-foreground mb-4">
-              You don't have any active tasks right now.
+              You don't have any active tasks right now. Perfect time to plan your next activities!
             </p>
             <Button
               onClick={handleCreateTaskClick}
@@ -230,105 +338,112 @@ const YourTasks = ({ className = '', onCreateTask }) => {
           </div>
         )}
 
-        {/* Tasks List */}
+        {/* Enhanced Tasks List */}
         {!loading && !error && tasks?.length > 0 && (
           <div className="space-y-4">
-            {tasks?.map(task => (
-              <div
-                key={task?.id}
-                className="p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    {/* Task Title & Status */}
-                    <div className="flex items-center space-x-2 mb-2">
-                      {getStatusIcon(task?.status)}
-                      <h4 className="text-sm font-medium text-foreground truncate">
-                        {task?.title || 'Untitled Task'}
-                      </h4>
-                      <span className={`
-                        inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border
-                        ${getPriorityStyle(task?.priority)}
-                      `}>
-                        {task?.priority || 'medium'}
-                      </span>
-                    </div>
-
-                    {/* Task Description */}
-                    {task?.description && (
-                      <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                        {task?.description}
-                      </p>
-                    )}
-
-                    {/* Due Date & Category */}
-                    <div className="flex items-center space-x-4 text-xs">
-                      {task?.due_date && (
-                        <div className="flex items-center space-x-1">
-                          <Clock className="w-3 h-3" />
-                          {formatDueDate(task?.due_date)}
-                        </div>
-                      )}
-                      {task?.category && (
-                        <span className="text-muted-foreground">
-                          {task?.category?.replace(/_/g, ' ')}
+            {tasks?.map(task => {
+              const isOverdue = task?.due_date && new Date(task.due_date) < new Date();
+              const isDueToday = task?.due_date && new Date(task.due_date)?.toDateString() === new Date()?.toDateString();
+              
+              return (
+                <div
+                  key={task?.id}
+                  className={`
+                    p-4 border rounded-lg transition-all duration-200 hover:shadow-md
+                    ${isOverdue ? 'border-red-200 bg-red-50' : isDueToday ? 'border-orange-200 bg-orange-50' : 'border-border bg-background hover:bg-muted/20'}
+                  `}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      {/* Task Title, Status & Priority */}
+                      <div className="flex items-center space-x-2 mb-2">
+                        {getStatusIcon(task?.status)}
+                        <h4 className="text-sm font-medium text-foreground truncate">
+                          {task?.title || 'Untitled Task'}
+                        </h4>
+                        <span className={`
+                          inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border
+                          ${getPriorityStyle(task?.priority)}
+                        `}>
+                          {(task?.priority || 'medium')?.toUpperCase()}
                         </span>
-                      )}
-                    </div>
-                  </div>
+                      </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center space-x-1 ml-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigate(`/task-details/${task?.id}`)}
-                      className="p-1 h-auto"
-                      title="View Details"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    
-                    {task?.status === 'pending' && (
+                      {/* Task Description */}
+                      {task?.description && (
+                        <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
+                          {task?.description}
+                        </p>
+                      )}
+
+                      {/* Due Date & Category */}
+                      <div className="flex items-center space-x-3 text-xs">
+                        {task?.due_date && (
+                          <div className="flex items-center">
+                            {formatDueDate(task?.due_date)}
+                          </div>
+                        )}
+                        {task?.category && (
+                          <span className="px-2 py-1 bg-muted rounded-full text-muted-foreground">
+                            {task?.category?.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center space-x-1 ml-4">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleUpdateStatus(task?.id, 'in_progress')}
-                        disabled={updating === task?.id}
-                        className="p-1 h-auto text-blue-600 hover:text-blue-700"
-                        title="Start Task"
+                        onClick={() => navigate(`/task-details/${task?.id}`)}
+                        className="p-1 h-auto"
+                        title="View Details"
                       >
-                        <Clock className="w-4 h-4" />
+                        <Eye className="w-4 h-4" />
                       </Button>
-                    )}
-                    
-                    {task?.status === 'in_progress' && (
+                      
+                      {task?.status === 'pending' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleUpdateStatus(task?.id, 'in_progress')}
+                          disabled={updating === task?.id}
+                          className="p-1 h-auto text-blue-600 hover:text-blue-700"
+                          title="Start Task"
+                        >
+                          <Clock className="w-4 h-4" />
+                        </Button>
+                      )}
+                      
+                      {task?.status === 'in_progress' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleUpdateStatus(task?.id, 'completed')}
+                          disabled={updating === task?.id}
+                          className="p-1 h-auto text-green-600 hover:text-green-700"
+                          title="Complete Task"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </Button>
+                      )}
+                      
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleUpdateStatus(task?.id, 'completed')}
+                        onClick={() => handleDeleteTask(task?.id)}
                         disabled={updating === task?.id}
-                        className="p-1 h-auto text-green-600 hover:text-green-700"
-                        title="Complete Task"
+                        className="p-1 h-auto text-red-600 hover:text-red-700"
+                        title="Delete Task"
                       >
-                        <CheckCircle className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" />
                       </Button>
-                    )}
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteTask(task?.id)}
-                      disabled={updating === task?.id}
-                      className="p-1 h-auto text-red-600 hover:text-red-700"
-                      title="Delete Task"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

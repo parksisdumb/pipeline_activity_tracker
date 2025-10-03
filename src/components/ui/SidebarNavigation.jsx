@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import Icon from '../AppIcon';
 import Button from './Button';
+import NotificationBell from './NotificationBell';
 
 const SidebarNavigation = ({ 
   userRole = 'rep', 
@@ -168,6 +169,20 @@ const SidebarNavigation = ({
       roles: ['rep', 'manager'],
       description: 'Sales opportunity management'
     },
+    { 
+      label: 'Roof Finder', 
+      path: '/roof-finder', 
+      icon: 'Map', 
+      roles: ['rep', 'manager'],
+      description: 'Map-based prospecting tool for ugly roofs'
+    },
+    { 
+      label: 'Documents', 
+      path: '/documents', 
+      icon: 'FileText', 
+      roles: ['rep', 'manager', 'admin'],
+      description: 'Document management and compliance'
+    },
   ];
 
   const isActive = (path) => {
@@ -236,16 +251,23 @@ const SidebarNavigation = ({
             )}
           </Link>
           
-          {!isCollapsed && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggleCollapse}
-              className="ml-auto flex-shrink-0"
-            >
-              <Icon name="ChevronLeft" size={16} />
-            </Button>
-          )}
+          {/* Notification Bell and Collapse Button */}
+          <div className="flex items-center space-x-1 ml-auto">
+            {/* Notification Bell */}
+            <NotificationBell />
+            
+            {/* Collapse Button */}
+            {!isCollapsed && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onToggleCollapse}
+                className="flex-shrink-0"
+              >
+                <Icon name="ChevronLeft" size={16} />
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Navigation */}
@@ -290,7 +312,10 @@ const SidebarNavigation = ({
                   Administration
                 </h3>
               )}
-              {navigationItems?.filter(item => item?.roles?.includes('admin'))?.map((item) => (
+              {navigationItems?.filter(item => 
+                item?.roles?.includes('admin') && 
+                !item?.roles?.includes('super_admin')
+              )?.map((item) => (
                 <Link
                   key={item?.path}
                   to={item?.path}
@@ -319,7 +344,6 @@ const SidebarNavigation = ({
             <div className="space-y-1">
               {navigationItems?.filter(item => 
                 item?.roles?.includes(actualUserRole) && 
-                !item?.roles?.includes('admin') &&
                 !item?.roles?.includes('super_admin')
               )?.map((item) => (
                 <Link

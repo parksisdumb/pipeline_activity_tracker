@@ -9,7 +9,8 @@ export const activitiesService = {
           user:user_profiles!user_id(id, full_name, email),
           account:accounts(id, name, company_type),
           contact:contacts(id, first_name, last_name, email),
-          property:properties(id, name, address)
+          property:properties(id, name, address),
+          opportunity:opportunities(id, name, stage, opportunity_type)
         `);
 
       // Apply filters
@@ -39,6 +40,10 @@ export const activitiesService = {
 
       if (filters?.propertyId) {
         query = query?.eq('property_id', filters?.propertyId);
+      }
+
+      if (filters?.opportunityId) {
+        query = query?.eq('opportunity_id', filters?.opportunityId);
       }
 
       if (filters?.dateFrom) {
@@ -130,7 +135,7 @@ export const activitiesService = {
     }
   },
 
-  // Enhanced activity statistics with time categorization
+  // Enhanced activity statistics with time categorization and new activity types
   async getActivityStats(userId, filters = {}) {
     if (!userId) return { success: false, error: 'User ID is required' };
 
@@ -177,7 +182,14 @@ export const activitiesService = {
         },
         thisWeek: 0,
         thisMonth: 0,
-        typeBreakdown: {} // Add explicit type breakdown for debugging
+        typeBreakdown: {}, // Add explicit type breakdown for debugging
+        kpiMetrics: {
+          pop_ins: 0,
+          dm_conversations: 0,
+          assessments_booked: 0,
+          proposals_sent: 0,
+          wins: 0
+        }
       };
 
       data?.forEach(activity => {
@@ -188,6 +200,27 @@ export const activitiesService = {
           stats.byType[activity.activity_type] = (stats?.byType?.[activity?.activity_type] || 0) + 1;
           // Also populate typeBreakdown for easier access
           stats.typeBreakdown[activity.activity_type] = (stats?.typeBreakdown?.[activity?.activity_type] || 0) + 1;
+          
+          // Map activity types to KPI metrics for goals tracking
+          switch (activity?.activity_type) {
+            case 'Pop-in':
+              stats.kpiMetrics.pop_ins++;
+              break;
+            case 'Decision Maker Conversation':
+              stats.kpiMetrics.dm_conversations++;
+              break;
+            case 'Assessment':
+              if (activity?.outcome === 'Assessment Completed') {
+                stats.kpiMetrics.assessments_booked++;
+              }
+              break;
+            case 'Proposal Sent':
+              stats.kpiMetrics.proposals_sent++;
+              break;
+            case 'Contract Signed':
+              stats.kpiMetrics.wins++;
+              break;
+          }
         }
 
         // Count by outcome
@@ -229,7 +262,10 @@ export const activitiesService = {
       console.log('Activity stats calculated:', {
         total: stats?.total,
         emailCount: stats?.typeBreakdown?.['Email'] || 0,
+        popInCount: stats?.typeBreakdown?.['Pop-in'] || 0,
+        dmConversationCount: stats?.typeBreakdown?.['Decision Maker Conversation'] || 0,
         allTypes: Object.keys(stats?.typeBreakdown),
+        kpiMetrics: stats?.kpiMetrics,
         dateFilter: filters
       });
 
@@ -250,7 +286,8 @@ export const activitiesService = {
           user:user_profiles!user_id(id, full_name, email),
           account:accounts(id, name, company_type),
           contact:contacts(id, first_name, last_name, email),
-          property:properties(id, name, address)
+          property:properties(id, name, address),
+          opportunity:opportunities(id, name, stage, opportunity_type)
         `)?.eq('id', activityId)?.single();
 
       if (error) {
@@ -268,7 +305,7 @@ export const activitiesService = {
     }
   },
 
-  // Create a new activity
+  // Enhanced createActivity method with follow-up support
   async createActivity(activityData) {
     try {
       // Ensure required fields are present
@@ -309,7 +346,8 @@ export const activitiesService = {
           user:user_profiles!user_id(id, full_name, email),
           account:accounts(id, name, company_type),
           contact:contacts(id, first_name, last_name, email),
-          property:properties(id, name, address)
+          property:properties(id, name, address),
+          opportunity:opportunities(id, name, stage, opportunity_type)
         `)?.single();
 
       if (error) {
@@ -332,6 +370,88 @@ export const activitiesService = {
     } catch (error) {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to create activity' };
+    }
+  },
+
+  // Enhanced createActivityWithFollowUp method
+  async createActivityWithFollowUp(activityData, followUpData = null) {
+    try {
+      // Create the activity first
+      const activityResult = await this.createActivity(activityData);
+      
+      if (!activityResult?.success) {
+        return activityResult;
+      }
+
+      // If follow-up data is provided, create a follow-up task
+      if (followUpData) {
+        try {
+          const { tasksService } = await import('./tasksService');
+          
+          const followUpTask = {
+            title: followUpData?.title || 'Follow-up Call',
+            description: followUpData?.description || `Follow-up from: ${activityData?.subject}`,
+            category: followUpData?.category || 'follow_up_call',
+            priority: followUpData?.priority || 'medium',
+            status: 'pending',
+            due_date: followUpData?.due_date,
+            account_id: activityData?.account_id,
+            contact_id: activityData?.contact_id,
+            property_id: activityData?.property_id,
+            opportunity_id: activityData?.opportunity_id
+          };
+
+          const followUpResult = await tasksService?.createTask(followUpTask);
+          
+          return {
+            success: true,
+            data: {
+              activity: activityResult?.data,
+              followUpTask: followUpResult
+            }
+          };
+        } catch (followUpError) {
+          console.error('Failed to create follow-up task:', followUpError);
+          // Return activity success even if follow-up fails
+          return {
+            success: true,
+            data: activityResult?.data,
+            warning: 'Activity created but follow-up task failed'
+          };
+        }
+      }
+
+      return activityResult;
+    } catch (error) {
+      console.error('Service error:', error);
+      return { success: false, error: 'Failed to create activity with follow-up' };
+    }
+  },
+
+  // New method to get tasks created from activities (follow-ups)
+  async getActivityFollowUps(activityId) {
+    if (!activityId) return { success: false, error: 'Activity ID is required' };
+
+    try {
+      const { data, error } = await supabase
+        ?.from('tasks')
+        ?.select(`
+          *,
+          assigned_user:assigned_to(id, full_name, email),
+          account:account_id(id, name),
+          contact:contact_id(id, first_name, last_name)
+        `)
+        ?.or(`description.ilike.%${activityId}%`)
+        ?.eq('category', 'follow_up_call')
+        ?.order('created_at', { ascending: false });
+
+      if (error) {
+        return { success: false, error: error?.message };
+      }
+
+      return { success: true, data: data || [] };
+    } catch (error) {
+      return { success: false, error: 'Failed to load activity follow-ups' };
     }
   },
 
@@ -369,7 +489,8 @@ export const activitiesService = {
           user:user_profiles!user_id(id, full_name, email),
           account:accounts(id, name, company_type),
           contact:contacts(id, first_name, last_name, email),
-          property:properties(id, name, address)
+          property:properties(id, name, address),
+          opportunity:opportunities(id, name, stage, opportunity_type)
         `)?.single();
 
       if (error) {
@@ -441,7 +562,8 @@ export const activitiesService = {
           *,
           user:user_profiles!user_id(id, full_name),
           contact:contacts(id, first_name, last_name),
-          property:properties(id, name, address)
+          property:properties(id, name, address),
+          opportunity:opportunities(id, name, stage)
         `)?.eq('account_id', accountId)?.order('activity_date', { ascending: false });
 
       if (limit) {
@@ -459,6 +581,37 @@ export const activitiesService = {
     } catch (error) {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to load account activities' };
+    }
+  },
+
+  // Get activities by opportunity ID - NEW METHOD
+  async getActivitiesByOpportunity(opportunityId, limit) {
+    if (!opportunityId) return { success: false, error: 'Opportunity ID is required' };
+
+    try {
+      let query = supabase?.from('activities')?.select(`
+          *,
+          user:user_profiles!user_id(id, full_name),
+          contact:contacts(id, first_name, last_name),
+          property:properties(id, name, address),
+          account:accounts(id, name)
+        `)?.eq('opportunity_id', opportunityId)?.order('activity_date', { ascending: false });
+
+      if (limit) {
+        query = query?.limit(limit);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Get activities by opportunity error:', error);
+        return { success: false, error: error?.message };
+      }
+
+      return { success: true, data: data || [] };
+    } catch (error) {
+      console.error('Service error:', error);
+      return { success: false, error: 'Failed to load opportunity activities' };
     }
   },
 
@@ -513,7 +666,7 @@ export const activitiesService = {
     }
   },
 
-  // Get activities by user ID
+  // Enhanced getActivitiesByUser method with KPI tracking
   async getActivitiesByUser(userId, filters = {}) {
     if (!userId) return { success: false, error: 'User ID is required' };
 
@@ -522,7 +675,8 @@ export const activitiesService = {
           *,
           account:accounts(id, name),
           contact:contacts(id, first_name, last_name),
-          property:properties(id, name)
+          property:properties(id, name),
+          opportunity:opportunities(id, name, stage)
         `)?.eq('user_id', userId);
 
       // Apply additional filters

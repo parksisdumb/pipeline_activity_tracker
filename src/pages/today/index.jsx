@@ -140,7 +140,7 @@ const TodayPage = () => {
                 </p>
                 <div className="space-y-2">
                   <button 
-                    onClick={() => navigate('/accounts-list')}
+                    onClick={() => navigate('/accounts')}
                     className="w-full bg-muted text-muted-foreground py-2 px-4 rounded-md hover:bg-muted/80 transition-colors"
                   >
                     View All Data

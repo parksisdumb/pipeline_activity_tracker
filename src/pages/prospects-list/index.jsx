@@ -13,6 +13,8 @@ import BulkActions from './components/BulkActions';
 import FilterToolbar from './components/FilterToolbar';
 import ImportProspectsModal from './components/ImportProspectsModal';
 import AddProspectModal from './components/AddProspectModal';
+import EditProspectModal from './components/EditProspectModal';
+import AddAccountModal from '../convert-prospect-modal';
 
 const ProspectsList = () => {
   const navigate = useNavigate();
@@ -23,8 +25,12 @@ const ProspectsList = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [addProspectModalOpen, setAddProspectModalOpen] = useState(false);
+  const [editProspectModalOpen, setEditProspectModalOpen] = useState(false);
+  const [prospectToEdit, setProspectToEdit] = useState(null);
   const [stats, setStats] = useState({});
   const [users, setUsers] = useState([]);
+  const [convertModalOpen, setConvertModalOpen] = useState(false);
+  const [prospectToConvert, setProspectToConvert] = useState(null);
   
   // Filters state
   const [filters, setFilters] = useState({
@@ -201,11 +207,11 @@ const ProspectsList = () => {
   };
 
   const handleConvertToAccount = async (prospectId) => {
-    // Open prospect drawer for conversion workflow
+    // Find the prospect and open the add account modal
     const prospect = prospects?.find(p => p?.id === prospectId);
     if (prospect) {
-      setSelectedProspect(prospect);
-      setDrawerOpen(true);
+      setProspectToConvert(prospect);
+      setConvertModalOpen(true);
     }
   };
 
@@ -289,6 +295,30 @@ const ProspectsList = () => {
     }
   };
 
+  // Handle edit prospect
+  const handleEditProspect = (prospect) => {
+    setProspectToEdit(prospect);
+    setEditProspectModalOpen(true);
+  };
+
+  // Handle prospect update
+  const handleUpdateProspect = async (prospectId, updateData) => {
+    try {
+      let result = await prospectsService?.updateProspect(prospectId, updateData);
+      if (result?.error) {
+        return { error: result?.error };
+      } else {
+        // Refresh data
+        loadProspects();
+        loadStats();
+        return { success: true };
+      }
+    } catch (error) {
+      console.error('Error updating prospect:', error);
+      return { error: 'Failed to update prospect. Please try again.' };
+    }
+  };
+
   const handleViewDetails = (prospect) => {
     setSelectedProspect(prospect);
     setDrawerOpen(true);
@@ -299,6 +329,84 @@ const ProspectsList = () => {
     setSelectedProspect(null);
     loadProspects(); // Refresh list in case of changes
     loadStats(); // Refresh stats
+  };
+
+  const handleEditModalClose = () => {
+    setEditProspectModalOpen(false);
+    setProspectToEdit(null);
+    loadProspects(); // Refresh list in case of changes
+    loadStats(); // Refresh stats
+  };
+
+  const handleConversionSuccess = (result) => {
+    console.log('Add Account Success:', result);
+    
+    if (!result) {
+      console.error('No result provided to success handler');
+      return;
+    }
+
+    // Display success notification
+    if (result?.message) {
+      // Create a simple notification
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: #10B981;
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        z-index: 1000;
+        font-weight: 500;
+        max-width: 400px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      `;
+      
+      notification.innerHTML = `
+        <div style="display: flex; align-items: center;">
+          <svg style="width: 20px; height: 20px; margin-right: 8px;" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+          </svg>
+          ${result?.message}
+        </div>
+      `;
+      
+      document.body?.appendChild(notification);
+      
+      // Remove notification after 4 seconds
+      setTimeout(() => {
+        if (notification?.parentNode) {
+          notification?.parentNode?.removeChild(notification);
+        }
+      }, 4000);
+    }
+    
+    // Refresh data to ensure UI consistency
+    loadProspects();
+    loadStats();
+    
+    // Close modal
+    setConvertModalOpen(false);
+    setProspectToConvert(null);
+    
+    // Offer navigation to the new account
+    if (result?.accountId) {
+      setTimeout(() => {
+        const shouldNavigate = window.confirm(
+          'Account successfully added! Would you like to view the new account details?'
+        );
+        if (shouldNavigate) {
+          navigate(`/account-details/${result?.accountId}`);
+        }
+      }, 1000);
+    }
+  };
+
+  const handleConvertModalClose = () => {
+    setConvertModalOpen(false);
+    setProspectToConvert(null);
   };
 
   return (
@@ -418,6 +526,7 @@ const ProspectsList = () => {
               onSort={handleSort}
               sort={sort}
               onViewDetails={handleViewDetails}
+              onEditProspect={handleEditProspect}
               onClaimProspect={handleClaimProspect}
               onUpdateStatus={handleUpdateStatus}
               onAddToRoute={handleAddToRoute}
@@ -483,6 +592,26 @@ const ProspectsList = () => {
             loadProspects();
             loadStats();
           }}
+        />
+      )}
+      
+      {/* Edit Prospect Modal */}
+      {editProspectModalOpen && prospectToEdit && (
+        <EditProspectModal
+          isOpen={editProspectModalOpen}
+          onClose={handleEditModalClose}
+          prospect={prospectToEdit}
+          onProspectUpdated={handleUpdateProspect}
+        />
+      )}
+      
+      {/* Add Account Modal */}
+      {convertModalOpen && prospectToConvert && (
+        <AddAccountModal
+          isOpen={convertModalOpen}
+          prospect={prospectToConvert}
+          onClose={handleConvertModalClose}
+          onConversionSuccess={handleConversionSuccess}
         />
       )}
     </div>

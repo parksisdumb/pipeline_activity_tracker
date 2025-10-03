@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../AppIcon';
 import Button from './Button';
 import UserProfileDropdown from './UserProfileDropdown';
+import NotificationBell from './NotificationBell';
 
 const Header = ({ userRole = 'rep', onMenuToggle, isMenuOpen = false }) => {
   const location = useLocation();
@@ -141,8 +142,11 @@ const Header = ({ userRole = 'rep', onMenuToggle, isMenuOpen = false }) => {
           )}
         </nav>
 
-        {/* User Profile - Use UserProfileDropdown component */}
+        {/* User Profile and Notifications */}
         <div className="flex items-center space-x-3">
+          {/* Notification Bell */}
+          <NotificationBell />
+          
           <div className="hidden sm:block">
             <UserProfileDropdown 
               user={displayUser}

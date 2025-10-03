@@ -24,12 +24,16 @@ export const prospectsService = {
         offset = 0
       } = pagination;
 
-      // Always use direct query instead of problematic database function
+      // FIXED: Use proper query structure with RLS policy compliance
       let query = supabase
         ?.from('prospects')
         ?.select(`
           *,
-          assigned_user:user_profiles!prospects_assigned_to_fkey(id, full_name, email)
+          assigned_user:user_profiles!prospects_assigned_to_fkey(
+            id,
+            full_name,
+            email
+          )
         `);
 
       // Apply filters
@@ -69,13 +73,21 @@ export const prospectsService = {
         query = query?.or(`name.ilike.%${search}%,domain.ilike.%${search}%`);
       }
 
-      // Apply sorting with proper column names
+      // FIXED: Apply sorting with proper null handling
       const sortColumn = column === 'icp_fit_score' ? 'icp_fit_score' : 
                         column === 'name' ? 'name' : 
                         column === 'created_at' ? 'created_at' :
                         column === 'last_activity_at' ? 'last_activity_at' : 'created_at';
       
-      query = query?.order(sortColumn, { ascending: direction === 'asc' });
+      // FIXED: Proper ordering with null handling
+      if (sortColumn === 'icp_fit_score') {
+        query = query?.order(sortColumn, { 
+          ascending: direction === 'asc',
+          nullsFirst: direction === 'asc' 
+        });
+      } else {
+        query = query?.order(sortColumn, { ascending: direction === 'asc' });
+      }
 
       // Apply pagination
       query = query?.range(offset, offset + limit - 1);
@@ -147,7 +159,7 @@ export const prospectsService = {
         priority: 'medium',
         status: 'pending',
         due_date: new Date()?.toISOString()?.split('T')?.[0], // Today's date
-        prospect_id: id // Note: You may need to add this column to tasks table if it doesn't exist
+        prospect_id: id // ✅ Now this column exists in the database
       };
 
       const { data, error } = await supabase
@@ -548,7 +560,7 @@ export const prospectsService = {
     }
   },
 
-  // Convert prospect to account - FIXED TO MATCH DATABASE FUNCTION SIGNATURE
+  // ENHANCED: Convert prospect to account - with better error handling and validation
   async convertToAccount(prospectId, linkAccountId = null) {
     try {
       // Validate prospect ID format
@@ -560,35 +572,162 @@ export const prospectsService = {
 
       console.log('Converting prospect with ID:', prospectId, 'Link to account:', linkAccountId);
 
-      // Call database function with correct parameters (matches function signature)
-      const { data, error } = await supabase?.rpc('convert_prospect_to_account', {
+      // ENHANCED: Check authentication state first
+      const { data: { user }, error: userError } = await supabase?.auth?.getUser();
+      if (userError || !user) {
+        console.error('Authentication error during conversion:', userError);
+        return { data: null, error: 'Authentication required. Please log in and try again.' };
+      }
+
+      // ENHANCED: Check if prospect exists and is accessible before conversion
+      const { data: prospectCheck, error: checkError } = await supabase
+        ?.from('prospects')
+        ?.select('id, name, status, tenant_id')
+        ?.eq('id', prospectId)
+        ?.single();
+
+      if (checkError) {
+        console.error('Error checking prospect before conversion:', checkError);
+        if (checkError?.code === 'PGRST116') {
+          return { data: null, error: 'Prospect not found or access denied' };
+        }
+        return { data: null, error: 'Unable to verify prospect. Please try again.' };
+      }
+
+      if (!prospectCheck) {
+        return { data: null, error: 'Prospect not found or has already been removed' };
+      }
+
+      if (prospectCheck?.status === 'converted') {
+        return { data: null, error: 'Prospect has already been converted to an account' };
+      }
+
+      // ENHANCED: Validate linkAccountId if provided
+      if (linkAccountId) {
+        const linkUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!linkUuidRegex?.test(linkAccountId)) {
+          return { data: null, error: 'Invalid account ID format for linking' };
+        }
+
+        // Verify the account exists and is accessible
+        const { data: accountCheck, error: accountError } = await supabase
+          ?.from('accounts')
+          ?.select('id, name, tenant_id')
+          ?.eq('id', linkAccountId)
+          ?.single();
+
+        if (accountError || !accountCheck) {
+          console.error('Link account validation failed:', accountError);
+          return { data: null, error: 'Selected account not found or access denied' };
+        }
+
+        // Verify same tenant
+        if (accountCheck?.tenant_id !== prospectCheck?.tenant_id) {
+          return { data: null, error: 'Account and prospect must belong to the same organization' };
+        }
+      }
+
+      // ENHANCED: Call database function with comprehensive error handling
+      console.log('Calling convert_prospect_to_account function with:', {
+        prospect_uuid: prospectId,
+        link_to_existing_account_id: linkAccountId
+      });
+
+      const { data: functionResult, error: functionError } = await supabase?.rpc('convert_prospect_to_account', {
         prospect_uuid: prospectId,
         link_to_existing_account_id: linkAccountId || null
       });
 
-      if (error) {
-        console.error('Error converting prospect:', error);
-        return { data: null, error: error?.message };
+      if (functionError) {
+        console.error('Database function error during conversion:', functionError);
+        
+        // ENHANCED: Map specific database errors to user-friendly messages
+        switch (functionError?.code) {
+          case '23505': // Unique constraint violation
+            return { data: null, error: 'A duplicate account with this information already exists.' };
+          case '23503': // Foreign key constraint violation
+            return { data: null, error: 'Invalid reference data. Please refresh the page and try again.' };
+          case '42501': // Permission denied
+            return { data: null, error: 'You do not have permission to perform this operation.' };
+          case 'P0001': // Custom error from function
+            return { data: null, error: functionError?.message || 'Business logic error during conversion.' };
+          case '22P02': // Invalid UUID format
+            return { data: null, error: 'Invalid data format provided for conversion.' };
+          case '42883': // Function does not exist
+            return { data: null, error: 'Conversion service is temporarily unavailable. Please contact support.' };
+          case '22P05': // Invalid enum value (company_type casting issue)
+            return { data: null, error: 'Invalid company type. The prospect\'s company type cannot be converted. Please update the prospect first.' };
+          case '23514': // Check constraint violation
+            return { data: null, error: 'Data validation failed. Please check prospect information and try again.' };
+          default:
+            // Log unknown errors for debugging with more context
+            console.error('Unknown database error during conversion:', {
+              error: functionError,
+              prospectId,
+              linkAccountId,
+              sqlState: functionError?.code,
+              details: functionError?.details
+            });
+            return { data: null, error: `Conversion failed: ${functionError?.message || 'Unknown database error'}. Please try again or contact support.` };
+        }
       }
 
-      // Handle the returned data from the function
-      const result = data?.[0];
+      // ENHANCED: Handle function response with better validation
+      if (!functionResult) {
+        console.error('No result returned from conversion function');
+        return { data: null, error: 'No response from conversion service. Please try again.' };
+      }
+
+      // Handle array or single object result
+      const result = Array.isArray(functionResult) ? functionResult?.[0] : functionResult;
+      
+      if (!result) {
+        console.error('Empty result from conversion function');
+        return { data: null, error: 'Empty response from conversion service. Please try again.' };
+      }
+
+      // ENHANCED: Validate function success response
       if (!result?.success) {
-        return { data: null, error: result?.message || 'Conversion failed.' };
+        const errorMessage = result?.message || 'Conversion failed without specific reason';
+        console.error('Conversion function returned failure:', result);
+        return { data: null, error: errorMessage };
       }
 
-      return { 
-        data: {
-          success: true,
-          message: result?.message,
-          accountId: result?.account_id,
-          prospectId: result?.prospect_id
-        }, 
-        error: null 
+      // ENHANCED: Validate returned data structure
+      if (!result?.account_id && !linkAccountId) {
+        console.warn('Function succeeded but no account_id returned for new account creation');
+        // This might still be a success, just with incomplete data
+      }
+
+      // ENHANCED: Return structured success response with debugging info
+      const successData = {
+        success: true,
+        message: result?.message || 'Prospect successfully converted to account!',
+        accountId: result?.account_id || linkAccountId,
+        prospectId: result?.prospect_id || prospectId,
+        conversionType: linkAccountId ? 'link' : 'new'
       };
+
+      console.log('Conversion successful with enhanced data:', successData);
+      return { data: successData, error: null };
+
     } catch (error) {
-      console.error('Convert prospect error:', error);
-      return { data: null, error: 'Failed to convert prospect to account.' };
+      console.error('Unexpected error during prospect conversion:', error);
+      
+      // ENHANCED: Handle different types of errors with more specific messaging
+      if (error?.message?.includes('Network')) {
+        return { data: null, error: 'Network connection error. Please check your internet and try again.' };
+      } else if (error?.message?.includes('timeout')) {
+        return { data: null, error: 'Request timeout. The conversion may have succeeded. Please refresh and check your accounts.' };
+      } else if (error?.name === 'AbortError') {
+        return { data: null, error: 'Request was cancelled. Please try again.' };
+      } else if (error?.message?.includes('fetch')) {
+        return { data: null, error: 'Connection error. Please check your network and try again.' };
+      } else if (error?.message?.includes('JSON')) {
+        return { data: null, error: 'Data format error. Please refresh the page and try again.' };
+      }
+      
+      return { data: null, error: 'Unexpected error during conversion. Please try again or contact support if the problem persists.' };
     }
   },
 
@@ -603,7 +742,7 @@ export const prospectsService = {
         priority: 'medium',
         status: 'pending',
         due_date: routeDate,
-        prospect_id: id // Note: You may need to add this column to tasks table if it doesn't exist
+        prospect_id: id // ✅ Now this column exists in the database
       };
 
       const { data, error } = await supabase

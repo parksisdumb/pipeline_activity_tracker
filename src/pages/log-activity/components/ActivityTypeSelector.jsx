@@ -25,6 +25,16 @@ const ActivityTypeSelector = ({ value, onChange, error, disabled = false }) => {
       description: 'Visit to property location'
     },
     { 
+      value: 'Pop-in', 
+      label: 'Pop-in',
+      description: 'Unscheduled property visit or drop-by'
+    },
+    { 
+      value: 'Decision Maker Conversation', 
+      label: 'Decision Maker Conversation',
+      description: 'Direct conversation with key decision maker'
+    },
+    { 
       value: 'Proposal Sent', 
       label: 'Proposal Sent',
       description: 'Formal proposal submitted to client'
@@ -53,6 +63,7 @@ const ActivityTypeSelector = ({ value, onChange, error, disabled = false }) => {
         <h3 className="text-sm font-medium text-foreground">Activity Type</h3>
       </div>
       <Select
+        ref={null}
         options={activityTypes}
         value={value}
         onChange={onChange}

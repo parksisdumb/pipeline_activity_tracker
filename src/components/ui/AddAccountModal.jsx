@@ -34,7 +34,9 @@ const AddAccountModal = ({ isOpen, onClose, onAccountAdded }) => {
     'Architecture/Engineering',
     'Commercial Office',
     'Retail',
-    'Healthcare'
+    'Healthcare',
+    'Affiliate: Real Estate',
+    'Affiliate: Manufacturer'
   ];
 
   const handleInputChange = (field, value) => {

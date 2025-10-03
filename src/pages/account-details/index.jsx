@@ -303,11 +303,11 @@ const AccountDetails = () => {
   };
 
   const handleAddProperty = () => {
-    navigate(`/add-property-modal?accountId=${accountId}`);
+    navigate(`/add-property?accountId=${accountId}`);
   };
 
   const handleAddContact = () => {
-    navigate(`/add-contact-modal?accountId=${accountId}`);
+    navigate(`/add-contact?accountId=${accountId}`);
   };
 
   const handleSidebarToggle = () => {

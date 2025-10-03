@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Plus, Clock, User, Phone, Mail, FileText, Calendar } from 'lucide-react';
 
 const ActivitiesTab = ({ activities = [], loading = false, onLogActivity }) => {
-  const [showAddActivity, setShowAddActivity] = useState(false);
 
   const getActivityIcon = (type) => {
     switch (type?.toLowerCase()) {
@@ -62,15 +61,16 @@ const ActivitiesTab = ({ activities = [], loading = false, onLogActivity }) => {
     <div className="space-y-6">
       {/* Add Activity Button */}
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium text-gray-900">Recent Activities</h3>
+        <h3 className="text-lg font-medium text-gray-900">Activities</h3>
         <button
-          onClick={() => setShowAddActivity(true)}
+          onClick={() => onLogActivity?.()}
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
           <Plus className="h-4 w-4 mr-2" />
           Log Activity
         </button>
       </div>
+      
       {/* Activities List */}
       {activities?.length > 0 ? (
         <div className="space-y-4">
@@ -89,7 +89,7 @@ const ActivitiesTab = ({ activities = [], loading = false, onLogActivity }) => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <h4 className="text-sm font-medium text-gray-900">
-                        {activity?.activity_type?.replace(/([A-Z])/g, ' $1')?.trim()}
+                        {activity?.subject || activity?.activity_type}
                       </h4>
                       {activity?.outcome && (
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getOutcomeColor(activity?.outcome)}`}>
@@ -99,7 +99,7 @@ const ActivitiesTab = ({ activities = [], loading = false, onLogActivity }) => {
                     </div>
                     <div className="flex items-center text-xs text-gray-500">
                       <Clock className="h-3 w-3 mr-1" />
-                      {formatDate(activity?.created_at)}
+                      {formatDate(activity?.activity_date)}
                     </div>
                   </div>
 
@@ -110,11 +110,36 @@ const ActivitiesTab = ({ activities = [], loading = false, onLogActivity }) => {
                     </div>
                   )}
 
-                  {/* User Info */}
-                  {activity?.user && (
-                    <div className="mt-2 flex items-center text-xs text-gray-500">
-                      <User className="h-3 w-3 mr-1" />
-                      {activity?.user?.full_name || activity?.user?.email}
+                  {/* Related entities */}
+                  <div className="mt-2 flex items-center space-x-4 text-xs text-gray-500">
+                    {activity?.user && (
+                      <div className="flex items-center">
+                        <User className="h-3 w-3 mr-1" />
+                        {activity?.user?.full_name || activity?.user?.email}
+                      </div>
+                    )}
+                    {activity?.account && (
+                      <div className="flex items-center">
+                        <span>Account: {activity?.account?.name}</span>
+                      </div>
+                    )}
+                    {activity?.contact && (
+                      <div className="flex items-center">
+                        <span>Contact: {activity?.contact?.first_name} {activity?.contact?.last_name}</span>
+                      </div>
+                    )}
+                    {activity?.property && (
+                      <div className="flex items-center">
+                        <span>Property: {activity?.property?.name}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Follow-up indicator */}
+                  {activity?.follow_up_date && (
+                    <div className="mt-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
+                      <Calendar className="h-3 w-3 mr-1" />
+                      Follow-up: {new Date(activity?.follow_up_date)?.toLocaleDateString()}
                     </div>
                   )}
                 </div>
@@ -131,85 +156,12 @@ const ActivitiesTab = ({ activities = [], loading = false, onLogActivity }) => {
           </p>
           <div className="mt-6">
             <button
-              onClick={() => setShowAddActivity(true)}
+              onClick={() => onLogActivity?.()}
               className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               <Plus className="h-4 w-4 mr-2" />
               Log First Activity
             </button>
-          </div>
-        </div>
-      )}
-      {/* Simple Add Activity Modal */}
-      {showAddActivity && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
-            <div className="mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Log Activity</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Record an activity related to this opportunity
-              </p>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Activity Type
-                </label>
-                <select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white focus:ring-blue-500 focus:border-blue-500">
-                  <option value="phone call">Phone Call</option>
-                  <option value="email">Email</option>
-                  <option value="meeting">Meeting</option>
-                  <option value="site visit">Site Visit</option>
-                  <option value="proposal sent">Proposal Sent</option>
-                  <option value="follow-up">Follow-up</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Notes
-                </label>
-                <textarea
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                  rows={3}
-                  placeholder="Enter activity details..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Outcome
-                </label>
-                <select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white focus:ring-blue-500 focus:border-blue-500">
-                  <option value="">Select outcome</option>
-                  <option value="successful">Successful</option>
-                  <option value="no answer">No Answer</option>
-                  <option value="callback requested">Callback Requested</option>
-                  <option value="not interested">Not Interested</option>
-                  <option value="interested">Interested</option>
-                  <option value="meeting scheduled">Meeting Scheduled</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => setShowAddActivity(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  // TODO: Implement activity logging
-                  setShowAddActivity(false);
-                }}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Log Activity
-              </button>
-            </div>
           </div>
         </div>
       )}

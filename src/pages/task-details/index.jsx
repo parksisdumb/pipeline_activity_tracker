@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { tasksService } from '../../services/tasksService';
+import tasksService from '../../services/tasksService';
 import { TaskHeader } from './components/TaskHeader';
 import { TaskInformation } from './components/TaskInformation';
 import { StatusManagement } from './components/StatusManagement';
@@ -9,7 +9,7 @@ import { TaskEditor } from './components/TaskEditor';
 import { QuickActions } from './components/QuickActions';
 
 export default function TaskDetails() {
-  const { taskId } = useParams();
+  const { id: taskId } = useParams();
   const navigate = useNavigate();
   
   const [task, setTask] = useState(null);
@@ -21,10 +21,15 @@ export default function TaskDetails() {
 
   // Load task data
   const loadTaskData = async () => {
-    if (!taskId) return;
+    if (!taskId) {
+      setError('Task ID not provided');
+      setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
+      console.log('Loading task data for ID:', taskId);
       const { data: tasksData, error: tasksError } = await tasksService?.getTasks();
       
       if (tasksError) throw tasksError;
@@ -35,9 +40,11 @@ export default function TaskDetails() {
         return;
       }
       
+      console.log('Task loaded successfully:', foundTask);
       setTask(foundTask);
       await loadComments();
     } catch (err) {
+      console.error('Failed to load task data:', err);
       setError(err?.message || 'Failed to load task');
     } finally {
       setLoading(false);
@@ -54,6 +61,7 @@ export default function TaskDetails() {
       if (error) throw error;
       setComments(data || []);
     } catch (err) {
+      console.error('Failed to load comments:', err);
       setError(`Failed to load comments: ${err?.message || 'Unknown error'}`);
     } finally {
       setCommentsLoading(false);
@@ -70,6 +78,7 @@ export default function TaskDetails() {
       await loadTaskData();
       setIsEditing(false);
     } catch (err) {
+      console.error('Failed to update task:', err);
       setError(`Failed to update task: ${err?.message || 'Unknown error'}`);
     }
   };
@@ -85,6 +94,7 @@ export default function TaskDetails() {
       }
       await loadTaskData();
     } catch (err) {
+      console.error('Failed to update status:', err);
       setError(`Failed to update status: ${err?.message || 'Unknown error'}`);
     }
   };
@@ -96,6 +106,7 @@ export default function TaskDetails() {
       if (error) throw error;
       await loadComments();
     } catch (err) {
+      console.error('Failed to add comment:', err);
       setError(`Failed to add comment: ${err?.message || 'Unknown error'}`);
     }
   };
@@ -111,12 +122,14 @@ export default function TaskDetails() {
       if (error) throw error;
       navigate('/tasks');
     } catch (err) {
+      console.error('Failed to delete task:', err);
       setError(`Failed to delete task: ${err?.message || 'Unknown error'}`);
     }
   };
 
   // Load data on mount
   useEffect(() => {
+    console.log('Task ID from params:', taskId);
     loadTaskData();
   }, [taskId]);
 
@@ -133,8 +146,8 @@ export default function TaskDetails() {
     });
 
     return () => {
-      unsubscribeTasks();
-      unsubscribeComments();
+      if (unsubscribeTasks) unsubscribeTasks();
+      if (unsubscribeComments) unsubscribeComments();
     };
   }, [taskId]);
 
@@ -154,6 +167,7 @@ export default function TaskDetails() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-600 text-lg font-medium">{error}</div>
+          <p className="mt-2 text-gray-600">Task ID: {taskId}</p>
           <button 
             onClick={() => navigate('/tasks')}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -170,6 +184,7 @@ export default function TaskDetails() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="text-gray-600 text-lg">Task not found</div>
+          <p className="mt-2 text-gray-600">Task ID: {taskId}</p>
           <button 
             onClick={() => navigate('/tasks')}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"

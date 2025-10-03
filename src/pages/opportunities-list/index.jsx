@@ -229,11 +229,11 @@ const OpportunitiesList = () => {
 
   // Handle opportunity actions
   const handleViewOpportunity = useCallback((opportunityId) => {
-    navigate(`/opportunities/${opportunityId}`);
+    navigate(`/opportunity-details/${opportunityId}`);
   }, [navigate]);
 
   const handleEditOpportunity = useCallback((opportunity) => {
-    navigate(`/opportunities/${opportunity?.id}?edit=true`);
+    navigate(`/opportunity-details/${opportunity?.id}?edit=true`);
   }, [navigate]);
 
   const handleDeleteOpportunity = useCallback(async (opportunityId) => {

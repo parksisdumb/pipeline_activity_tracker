@@ -63,27 +63,22 @@ const OpportunityDetails = () => {
     try {
       setLoadingActivities(true);
       
-      const response = await activitiesService?.getActivities({
-        // We'll need to add opportunity_id filter to activities service
-        search: id, // Temporary workaround - search for opportunity ID in notes
-        limit: 50
-      });
+      // Use proper opportunity-based filtering instead of search workaround
+      const response = await activitiesService?.getActivitiesByOpportunity(id, 50);
       
       if (response?.success) {
-        // Filter activities that might be related to this opportunity
-        const relatedActivities = response?.data?.filter(activity => 
-          activity?.notes?.includes(id) ||
-          activity?.account_id === opportunity?.account?.id ||
-          activity?.property_id === opportunity?.property?.id
-        ) || [];
-        setActivities(relatedActivities);
+        setActivities(response?.data || []);
+      } else {
+        console.error('Error loading activities:', response?.error);
+        setActivities([]);
       }
     } catch (error) {
       console.error('Error loading activities:', error);
+      setActivities([]);
     } finally {
       setLoadingActivities(false);
     }
-  }, [id, opportunity?.account?.id, opportunity?.property?.id]);
+  }, [id]);
 
   // Initial data loading
   useEffect(() => {
@@ -153,30 +148,61 @@ const OpportunityDetails = () => {
     }
   }, [id, navigate]);
 
-  // Handle activity logging
-  const handleLogActivity = useCallback(async (activityData) => {
-    try {
-      // Add opportunity context to activity
-      const activityWithContext = {
-        ...activityData,
-        account_id: opportunity?.account?.id,
-        property_id: opportunity?.property?.id,
-        notes: `${activityData?.notes || ''} [Related to Opportunity: ${opportunity?.name}]`
-      };
+  // Handle activity logging - enhanced to include opportunity context
+  const handleLogActivity = useCallback((activityData = null) => {
+    // If activityData is provided, it's a direct activity creation
+    if (activityData) {
+      const createActivityAsync = async () => {
+        try {
+          // Add opportunity context to activity
+          const activityWithContext = {
+            ...activityData,
+            account_id: opportunity?.account_id,
+            property_id: opportunity?.property_id,
+            opportunity_id: id, // Direct opportunity linking
+            subject: activityData?.subject || `${activityData?.activity_type} - ${opportunity?.name}`,
+          };
 
-      const response = await activitiesService?.createActivity(activityWithContext);
+          const response = await activitiesService?.createActivity(activityWithContext);
+          
+          if (response?.success) {
+            // Reload activities
+            await loadActivities();
+          } else {
+            setError(response?.error || 'Failed to log activity');
+          }
+        } catch (error) {
+          console.error('Error logging activity:', error);
+          setError('An unexpected error occurred while logging activity');
+        }
+      };
       
-      if (response?.success) {
-        // Reload activities
-        await loadActivities();
-      } else {
-        setError(response?.error || 'Failed to log activity');
-      }
-    } catch (error) {
-      console.error('Error logging activity:', error);
-      setError('An unexpected error occurred while logging activity');
+      createActivityAsync();
+    } else {
+      // Navigate to Log Activity page with opportunity context pre-filled
+      navigate('/log-activity', {
+        state: {
+          preselected: {
+            opportunity: {
+              value: opportunity?.id,
+              label: opportunity?.name,
+              description: `${opportunity?.opportunity_type} - ${opportunity?.stage}`
+            },
+            account: opportunity?.account ? {
+              value: opportunity?.account_id,
+              label: opportunity?.account?.name,
+              description: opportunity?.account?.company_type
+            } : null,
+            property: opportunity?.property ? {
+              value: opportunity?.property_id,
+              label: opportunity?.property?.name,
+              description: opportunity?.property?.address
+            } : null
+          }
+        }
+      });
     }
-  }, [opportunity, loadActivities]);
+  }, [opportunity, id, loadActivities, navigate]);
 
   const handleGoBack = () => {
     navigate('/opportunities');

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronUp, ChevronDown, ExternalLink, UserPlus, Phone, Eye, Building2, MapPin, Globe, Star, User } from 'lucide-react';
+import { ChevronUp, ChevronDown, UserPlus, Phone, Eye, Building2, MapPin, Globe, Star, User, Edit, ExternalLink } from 'lucide-react';
 import Button from '../../../components/ui/Button';
 
 const ProspectsTable = ({
@@ -11,6 +11,7 @@ const ProspectsTable = ({
   onSort,
   sort,
   onViewDetails,
+  onEditProspect,
   onClaimProspect,
   onUpdateStatus,
   onAddToRoute,
@@ -131,7 +132,7 @@ const ProspectsTable = ({
                     {getSortIcon('last_activity_at')}
                   </div>
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
                   Actions
                 </th>
               </tr>
@@ -206,6 +207,22 @@ const ProspectsTable = ({
                       >
                         <Eye className="w-4 h-4" />
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onEditProspect?.(prospect)}
+                        className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 p-1"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onConvertToAccount?.(prospect?.id)}
+                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 p-1"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
                       {!prospect?.assigned_to && (
                         <Button
                           size="sm"
@@ -216,14 +233,6 @@ const ProspectsTable = ({
                           <UserPlus className="w-4 h-4" />
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onConvertToAccount?.(prospect?.id)}
-                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 p-1"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -299,6 +308,24 @@ const ProspectsTable = ({
                 >
                   <Eye className="w-4 h-4 mr-1" />
                   View
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onEditProspect?.(prospect)}
+                  className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                >
+                  <Edit className="w-4 h-4 mr-1" />
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onConvertToAccount?.(prospect?.id)}
+                  className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                >
+                  <ExternalLink className="w-4 h-4 mr-1" />
+                  Convert
                 </Button>
                 {!prospect?.assigned_to && (
                   <Button

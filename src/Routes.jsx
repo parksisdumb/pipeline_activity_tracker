@@ -40,7 +40,14 @@ import AddPropertyModal from './pages/add-property-modal';
 import AddContactModal from './pages/add-contact-modal';
 import CreateTaskModal from './pages/create-task-modal';
 import ConvertProspectModal from './pages/convert-prospect-modal';
+import DocumentsPage from './pages/documents';
+import UploadDocumentModal from './pages/upload-document-modal';
+// Import Roof Finder page
+import UglyRoofFinderMap from './pages/ugly-roof-finder-map';
+// Import new Lead Conversion Workflow page
+import LeadConversionWorkflow from './pages/lead-conversion-workflow';
 import NotFound from './pages/NotFound';
+
 const Routes = () => {
   return (
     <BrowserRouter>
@@ -58,42 +65,61 @@ const Routes = () => {
             <Route path="/temporary-password-setup" element={<TemporaryPasswordSetup />} />
             <Route path="/password-setup" element={<PasswordSetup />} />
             <Route path="/profile-creation" element={<ProfileCreation />} />
+            
             {/* Main App Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/today" element={<Today />} />
+            
             {/* Accounts & Contacts */}
             <Route path="/accounts" element={<AccountsList />} />
             <Route path="/account-details/:id" element={<AccountDetails />} />
             <Route path="/contacts" element={<ContactsList />} />
             <Route path="/contact-details/:id" element={<ContactDetails />} />
+            
             {/* Prospects */}
             <Route path="/prospects" element={<ProspectsList />} />
             <Route path="/prospect-details/:id" element={<ProspectDetails />} />
+            
             {/* Opportunities & Properties */}
             <Route path="/opportunities" element={<OpportunitiesList />} />
             <Route path="/opportunity-details/:id" element={<OpportunityDetails />} />
             <Route path="/properties" element={<PropertiesList />} />
             <Route path="/property-details/:id" element={<PropertyDetails />} />
+            
             {/* Activities & Tasks */}
             <Route path="/activities" element={<Activities />} />
             <Route path="/tasks" element={<TaskManagement />} />
             <Route path="/task-details/:id" element={<TaskDetails />} />
             <Route path="/log-activity" element={<LogActivity />} />
+            
             {/* Management */}
             <Route path="/weekly-goals" element={<WeeklyGoals />} />
             <Route path="/manager-dashboard" element={<ManagerDashboard />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
             <Route path="/super-admin-dashboard" element={<SuperAdminDashboard />} />
             <Route path="/super-admin-user-management" element={<SuperAdminUserManagement />} />
+            
+            {/* Documents Module */}
+            <Route path="/documents" element={<DocumentsPage />} />
+            
+            {/* Roof Finder */}
+            <Route path="/roof-finder" element={<UglyRoofFinderMap />} />
+            
+            {/* Lead Conversion Workflow */}
+            <Route path="/lead-conversion-workflow" element={<LeadConversionWorkflow />} />
+            
             {/* Profile */}
             <Route path="/profile" element={<Profile />} />
             <Route path="/user-profile" element={<UserProfile />} />
+            
             {/* Modal Routes */}
             <Route path="/add-opportunity" element={<AddOpportunityModal />} />
             <Route path="/add-property" element={<AddPropertyModal />} />
             <Route path="/add-contact" element={<AddContactModal />} />
             <Route path="/create-task" element={<CreateTaskModal />} />
             <Route path="/convert-prospect-modal" element={<ConvertProspectModal />} />
+            <Route path="/upload-document-modal" element={<UploadDocumentModal />} />
+            
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </RouterRoutes>
@@ -102,4 +128,5 @@ const Routes = () => {
     </BrowserRouter>
   );
 };
+
 export default Routes;

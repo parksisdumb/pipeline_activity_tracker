@@ -14,6 +14,7 @@ import Icon from '../../components/AppIcon';
 import { useAuth } from '../../contexts/AuthContext';
 import { activitiesService } from '../../services/activitiesService';
 
+
 const LogActivity = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,6 +28,7 @@ const LogActivity = () => {
     property: null,
     contact: null
   });
+  const [followUpCreated, setFollowUpCreated] = useState(null);
 
   const {
     register,
@@ -41,6 +43,7 @@ const LogActivity = () => {
       account: '',
       property: '',
       contact: '',
+      opportunity: '', // Add opportunity field
       outcome: '',
       notes: ''
     }
@@ -64,6 +67,11 @@ const LogActivity = () => {
         setValue('contact', state?.contact?.value);
         setSelectedEntities(prev => ({ ...prev, contact: state?.contact }));
       }
+      // Handle opportunity pre-filling
+      if (state?.opportunity) {
+        setValue('opportunity', state?.opportunity?.value);
+        setSelectedEntities(prev => ({ ...prev, opportunity: state?.opportunity }));
+      }
       if (state?.activityType) {
         setValue('activityType', state?.activityType);
       }
@@ -85,6 +93,43 @@ const LogActivity = () => {
           description: 'Contact'
         }
       }));
+    }
+    // Handle opportunity-specific context
+    else if (state?.opportunityId) {
+      setValue('opportunity', state?.opportunityId);
+      setSelectedEntities(prev => ({
+        ...prev,
+        opportunity: {
+          value: state?.opportunityId,
+          label: state?.opportunityName || 'Opportunity',
+          description: 'Opportunity'
+        }
+      }));
+      
+      // Also pre-fill related account/property if available
+      if (state?.accountId) {
+        setValue('account', state?.accountId);
+        setSelectedEntities(prev => ({
+          ...prev,
+          account: {
+            value: state?.accountId,
+            label: state?.accountName || 'Account',
+            description: 'Account'
+          }
+        }));
+      }
+      
+      if (state?.propertyId) {
+        setValue('property', state?.propertyId);
+        setSelectedEntities(prev => ({
+          ...prev,
+          property: {
+            value: state?.propertyId,
+            label: state?.propertyName || 'Property',
+            description: 'Property'
+          }
+        }));
+      }
     }
   }, [location?.state, setValue]);
 
@@ -130,24 +175,32 @@ const LogActivity = () => {
         return;
       }
 
-      // Create activity data for database
+      // Create activity data for database with opportunity linking
       const activityData = {
         activity_type: data?.activityType,
         account_id: data?.account,
         contact_id: data?.contact || null,
         property_id: data?.property || null,
+        opportunity_id: data?.opportunity || null, // Include opportunity_id
         outcome: data?.outcome || null,
         notes: data?.notes || '',
         activity_date: new Date()?.toISOString(),
-        subject: `${data?.activityType} - ${selectedEntities?.account?.label || 'Account Activity'}`
+        subject: data?.opportunity 
+          ? `${data?.activityType} - ${selectedEntities?.opportunity?.label || 'Opportunity Activity'}`
+          : `${data?.activityType} - ${selectedEntities?.account?.label || 'Account Activity'}`,
+        follow_up_date: null // Will be set separately if needed
       };
 
       // Save to database using the activities service
       const response = await activitiesService?.createActivity(activityData);
 
       if (response?.success) {
-        // Show success feedback
-        alert('Activity logged successfully!');
+        // Show success feedback with follow-up info
+        let successMessage = 'Activity logged successfully!';
+        if (followUpCreated) {
+          successMessage += ` Follow-up task created for ${followUpCreated?.date || followUpCreated?.action}.`;
+        }
+        alert(successMessage);
         
         // Navigate back to previous page or Today screen
         navigate('/today');
@@ -161,6 +214,12 @@ const LogActivity = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleFollowUpCreated = (followUpInfo) => {
+    setFollowUpCreated(followUpInfo);
+    // Show immediate feedback
+    console.log('Follow-up created:', followUpInfo);
   };
 
   const handleSaveAndNew = async (data) => {
@@ -178,16 +237,19 @@ const LogActivity = () => {
         return;
       }
 
-      // Create activity data for database
+      // Create activity data for database with opportunity linking
       const activityData = {
         activity_type: data?.activityType,
         account_id: data?.account,
         contact_id: data?.contact || null,
         property_id: data?.property || null,
+        opportunity_id: data?.opportunity || null, // Include opportunity_id
         outcome: data?.outcome || null,
         notes: data?.notes || '',
         activity_date: new Date()?.toISOString(),
-        subject: `${data?.activityType} - ${selectedEntities?.account?.label || 'Account Activity'}`
+        subject: data?.opportunity
+          ? `${data?.activityType} - ${selectedEntities?.opportunity?.label || 'Opportunity Activity'}`
+          : `${data?.activityType} - ${selectedEntities?.account?.label || 'Account Activity'}`
       };
 
       // Save to database using the activities service
@@ -203,6 +265,7 @@ const LogActivity = () => {
           account: watchedValues?.account,
           property: watchedValues?.property,
           contact: watchedValues?.contact,
+          opportunity: watchedValues?.opportunity, // Keep opportunity context
           outcome: '',
           notes: ''
         });
@@ -246,10 +309,22 @@ const LogActivity = () => {
               <div>
                 <h1 className="text-2xl font-bold text-foreground">Log Activity</h1>
                 <p className="text-sm text-muted-foreground">
-                  Quickly record your field activities and interactions
+                  Quickly record activities with instant follow-up creation
                 </p>
               </div>
             </div>
+            
+            {/* Follow-up Success Banner */}
+            {followUpCreated && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <Icon name="CheckCircle" size={16} className="text-green-600" />
+                  <span className="text-sm font-medium text-green-800">
+                    Follow-up created: {followUpCreated?.action || `Due ${new Date(followUpCreated.date)?.toLocaleDateString()}`}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Activity Form */}
@@ -278,6 +353,23 @@ const LogActivity = () => {
                   <SelectedEntityInfo
                     entityType="account"
                     entityData={selectedEntities?.account}
+                  />
+                )}
+
+                {/* Opportunity Selection - NEW */}
+                <EntitySearchSelector
+                  entityType="opportunity"
+                  value={watchedValues?.opportunity}
+                  onChange={(value) => handleEntitySelect('opportunity', value)}
+                  error={errors?.opportunity?.message}
+                  disabled={isLoading}
+                  onCreateNew={() => handleCreateEntity('opportunity')}
+                />
+
+                {selectedEntities?.opportunity && (
+                  <SelectedEntityInfo
+                    entityType="opportunity"
+                    entityData={selectedEntities?.opportunity}
                   />
                 )}
 
@@ -314,7 +406,7 @@ const LogActivity = () => {
                 )}
               </div>
 
-              {/* Outcome and Notes */}
+              {/* Enhanced Outcome and Notes with Follow-up */}
               <OutcomeNotesSection
                 outcome={watchedValues?.outcome}
                 onOutcomeChange={(value) => setValue('outcome', value)}
@@ -323,6 +415,13 @@ const LogActivity = () => {
                 outcomeError={errors?.outcome?.message}
                 notesError={errors?.notes?.message}
                 disabled={isLoading}
+                selectedEntityData={{
+                  account: watchedValues?.account,
+                  contact: watchedValues?.contact,
+                  property: watchedValues?.property,
+                  opportunity: watchedValues?.opportunity // Include opportunity context
+                }}
+                onFollowUpCreated={handleFollowUpCreated}
               />
             </div>
 
